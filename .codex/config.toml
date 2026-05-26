@@ -1,0 +1,18 @@
+# Project-scoped Codex MCP suggestions for TaskMarket402.
+# Verify exact command/package names if the environment differs.
+# Do not store secrets, private keys, wallet mnemonics, API keys, or service tokens here.
+# Supabase MCP should be added only after a Supabase project exists and credentials are handled safely.
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@latest"]
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest"]
+
+[mcp_servers.next-devtools]
+command = "npx"
+args = ["-y", "next-devtools-mcp@latest"]
+startup_timeout_ms = 20000
+env = { SystemRoot = "C:\\Windows", PROGRAMFILES = "C:\\Program Files" }

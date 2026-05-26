@@ -1,0 +1,46 @@
+{
+  "name": "taskmarket402",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "graphify": "graphify update .",
+    "repomix": "pnpm dlx repomix",
+    "verify": "pnpm lint && pnpm typecheck",
+    "test:e2e": "playwright test",
+    "test": "echo \"No tests configured yet\""
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "latest",
+    "@tanstack/react-query": "latest",
+    "clsx": "latest",
+    "lucide-react": "latest",
+    "next": "latest",
+    "openai": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "reactflow": "latest",
+    "tailwind-merge": "latest",
+    "viem": "latest",
+    "wagmi": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@tailwindcss/postcss": "latest",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "latest",
+    "playwright": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
