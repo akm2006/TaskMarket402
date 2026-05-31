@@ -72,6 +72,35 @@ export interface AgentOutput {
   riskSignals: string[];
 }
 
+export type RiskLevel = "low" | "medium" | "high" | "unknown";
+
+export type VeniceExecutionMode = "live" | "fallback";
+
+export type VeniceResultState =
+  | "completed"
+  | "skipped_missing_api_key"
+  | "empty_response"
+  | "invalid_response"
+  | "request_failed"
+  | "policy_rejected";
+
+export type VeniceConfidence = "low" | "medium" | "high" | "unknown";
+
+export interface FinalReportSection {
+  heading: string;
+  body: string;
+}
+
+export interface FinalReport {
+  title: string;
+  status: "synthesized" | "fallback";
+  summary: string;
+  riskLevel: RiskLevel;
+  sections: FinalReportSection[];
+  recommendations: string[];
+  verificationSummary: string;
+}
+
 export interface WorkGraphEvent {
   id: string;
   occurredAt: string;
@@ -86,10 +115,7 @@ export interface FinalReportPlaceholder {
   title: string;
   status: "placeholder";
   summary: string;
-  sections: {
-    heading: string;
-    body: string;
-  }[];
+  sections: FinalReportSection[];
 }
 
 export interface MissionRunSnapshot {

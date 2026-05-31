@@ -91,11 +91,11 @@ const workGraph: WorkGraph = {
     }),
     node("venice-verification", "Venice Verification", "verification", "verified", {
       status: "Mock verifier pass",
-      implementation: "Placeholder until Venice research and adapter work"
+      implementation: "Phase 1 UI mock; Phase 2 server adapter is separate"
     }),
     node("final-report", "Final Report", "report", "planned", {
       status: "Placeholder",
-      synthesis: "Awaiting real Venice implementation"
+      synthesis: "Phase 1 placeholder, not a live Venice report"
     }),
     node("blocked-payment", "Blocked Payment Demo", "payment", "blocked", {
       attemptedAmount: "0.80 USDC",
@@ -181,7 +181,7 @@ const events: WorkGraphEvent[] = [
     occurredAt: "09:30:18",
     actor: "Mock Verification",
     title: "Outputs accepted",
-    detail: "Typed mock outputs were accepted for report synthesis placeholder.",
+    detail: "Typed mock outputs were accepted for the Phase 1 report placeholder; this is not live Venice verification.",
     status: "verified",
     relatedNodeId: "venice-verification"
   }
@@ -190,7 +190,7 @@ const events: WorkGraphEvent[] = [
 const finalReport: FinalReportPlaceholder = {
   title: "Wallet / Token Risk Report",
   status: "placeholder",
-  summary: "Phase 1 renders the report shell and audit trail. Real Venice synthesis is intentionally deferred.",
+  summary: "Phase 1 renders the report shell and audit trail. This snapshot remains mock-only; live Venice synthesis is handled by the server adapter when wired into a runtime flow.",
   sections: [
     {
       heading: "Budget Trail",

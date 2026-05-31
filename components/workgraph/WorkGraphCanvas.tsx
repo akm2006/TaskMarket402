@@ -141,7 +141,7 @@ function getNodeText(node: WorkGraphNode): Pick<AuditNodeData, "eyebrow" | "prim
       return {
         eyebrow: "Verification placeholder",
         primary: metadata.status ?? "Mock verifier pass",
-        secondary: "Real Venice adapter deferred"
+        secondary: metadata.implementation ?? "Phase 1 UI mock"
       };
     case "final-report":
       return {

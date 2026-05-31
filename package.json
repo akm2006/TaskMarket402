@@ -11,7 +11,10 @@
     "repomix": "pnpm dlx repomix",
     "verify": "pnpm lint && pnpm typecheck",
     "test:e2e": "playwright test",
-    "test": "echo \"No tests configured yet\""
+    "smoke:venice": "vitest run scripts/smoke-venice.test.ts --pool=forks --reporter=verbose",
+    "smoke:gemini": "vitest run scripts/smoke-gemini.test.ts --pool=forks --reporter=verbose",
+    "test:unit": "vitest run tests --exclude tests/*.spec.ts",
+    "test": "vitest run tests --exclude tests/*.spec.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "latest",

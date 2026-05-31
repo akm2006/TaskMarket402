@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight, CircleDollarSign } from "lucide-react";
 import { phaseOneDemoSnapshot } from "@/lib/core/phase-one-demo";
 import { WorkGraphCanvas } from "@/components/workgraph/WorkGraphCanvas";
+import { AiRuntimePanel } from "@/components/mission/AiRuntimePanel";
 
 type MissionDetailPageProps = {
   params: Promise<{
@@ -28,8 +29,9 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             </Link>
             <h1 className="mt-4 text-4xl font-semibold tracking-tight">{snapshot.mission.title}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">
-              Target {snapshot.mission.targetAddress}. This mission detail page is a non-chain mock: no MetaMask,
-              x402 settlement, 1Shot relay, Venice API, or Supabase persistence is running.
+              Target {snapshot.mission.targetAddress}. The WorkGraph starts from the Phase 1 static mock snapshot; the
+              server-side AI runtime can generate provider-labeled plan, verification, and report states without wallet,
+              payment, relayer, or persistence integrations.
             </p>
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
@@ -62,6 +64,8 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
       <section className="px-5 pb-12">
         <div className="mx-auto grid max-w-7xl gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="space-y-5">
+            <AiRuntimePanel missionId={snapshot.mission.id} />
+
             <section className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-5">
               <div className="flex items-center gap-2">
                 <CircleDollarSign className="text-cyan-300" size={18} />

@@ -2,30 +2,97 @@
 
 ## Role In TaskMarket402
 
-Venice AI plans the mission, verifies specialist outputs, and synthesizes the final Wallet / Token Risk Report.
+Venice AI plans the mission, verifies specialist outputs, and synthesizes the final Wallet / Token Risk Report. Venice does not define payment policy; TaskMarket402 core policy remains authoritative.
 
-## Adapter Shape To Validate
+Venice remains the official sponsor AI path for the final demo. Gemini may be used only as a development/testing provider while Venice live inference is blocked by credits/billing, and Gemini output must not be presented as Venice output.
 
-- `planMission(input)`
-- `verifyAgentOutput(input)`
-- `synthesizeFinalReport(input)`
+## Sources Checked
 
-## Concepts To Verify Before Coding
+- Venice API docs: `https://docs.venice.ai/overview/getting-started`
+- Venice OpenAI migration guide: `https://docs.venice.ai/guides/getting-started/openai-migration`
+- Venice chat completions reference: `https://docs.venice.ai/api-reference/endpoint/chat/completions`
+- Venice model list reference: `https://docs.venice.ai/api-reference/endpoint/models/list`
+- Venice model traits reference: `https://docs.venice.ai/api-reference/endpoint/models/traits`
+- Venice billing balance reference: `https://docs.venice.ai/api-reference/endpoint/billing/balance`
+- Venice billing usage reference: `https://docs.venice.ai/api-reference/endpoint/billing/usage`
+- Venice error codes: `https://docs.venice.ai/api-reference/error-codes`
+- Installed package types: `openai@6.39.0` in `node_modules/openai`
 
-- Current OpenAI-compatible base URL.
-- Recommended model names.
-- Authentication headers.
-- Structured output support.
-- Rate limits and failure modes.
+## Current API Shape
 
-## Current Status
+- Base URL: `https://api.venice.ai/api/v1`
+- Auth: `Authorization: Bearer <VENICE_API_KEY>`
+- SDK strategy: Venice is OpenAI-compatible, so use the installed `openai` package with `new OpenAI({ apiKey, baseURL })`.
+- Endpoint used by this phase: `POST /chat/completions`.
+- Safe diagnostics endpoints:
+  - `GET /models?type=text`
+  - `GET /models/traits?type=text`
+  - `GET /billing/balance`
+- Request core:
+  - `model`
+  - `messages`
+  - `temperature`
+  - `response_format`
+  - optional Venice-specific parameters through `extra_body.venice_parameters` if later needed.
+- Response core:
+  - read `choices[0].message.content`
+  - parse the content as JSON
+  - validate with Zod before mapping into TaskMarket402 types.
 
-Placeholder only. Research current docs before implementing.
+## Model Choice
+
+- Default env override: `VENICE_MODEL`.
+- Current fallback model: `zai-org-glm-5-1`, because Venice chat-completion docs use it in examples and the live model-list smoke check confirmed it exists.
+- The model must remain configurable because Venice model availability, pricing, and naming can change.
+- Live smoke note on 2026-05-31: `GET /models?type=text` returned the selected model `zai-org-glm-5-1` in the available model list. `GET /models/traits?type=text` returned a different current trait default (`zai-org-glm-4.7`), so do not treat the local fallback as permanently equal to the provider trait default.
+
+## Structured JSON Strategy
+
+- The installed OpenAI package supports `response_format` on chat completions, including `json_object` and `json_schema`.
+- Venice migration docs state structured output compatibility through `response_format`.
+- Phase 2 will use `response_format: { type: "json_object" }` plus explicit system prompts and Zod validation.
+- `json_schema` may be used later after live model compatibility is verified against Venice. For this pass, Zod remains the enforcement layer.
+
+## Prompt Architecture
+
+- Venice uses the shared provider-neutral TaskMarket402 AI prompt payloads.
+- The task prompt says "You are the AI reasoning layer for TaskMarket402," requires JSON-only output, restricts planning to allowed specialist agents, preserves uncertainty, and prohibits defining or overriding payment policy.
+- Venice's official sponsor role is tracked outside prompts through provider selection and result metadata, not by provider-persona wording inside the task prompt.
+
+## Environment Variables
+
+- `VENICE_API_KEY`: server-only Venice API key. Never expose through `NEXT_PUBLIC_`.
+- `VENICE_BASE_URL`: optional override; defaults to `https://api.venice.ai/api/v1`.
+- `VENICE_MODEL`: optional override; defaults to `zai-org-glm-5-1`.
+
+## Adapter Functions
+
+- `planMissionWithVenice(mission)` returns a mission plan result with tasks, rationale, execution mode, state, and notes.
+- `verifyAgentOutputWithVenice(output)` returns verification state, confidence, notes, risk signals, and human-review status.
+- `synthesizeFinalReportWithVenice(outputs, mission?)` returns a real final-report shape with synthesis state.
+
+## Failure Modes
+
+- Missing `VENICE_API_KEY`: return deterministic fallback results and do not call Venice.
+- Empty completion content: return fallback with `empty_response`.
+- Malformed JSON or schema mismatch: return fallback with `invalid_response`.
+- Request/auth/rate-limit/provider errors: return fallback with `request_failed`.
+- Insufficient credits/balance: Venice documents `INSUFFICIENT_BALANCE` as HTTP `402` with the message "Insufficient USD or Diem balance to complete request"; live inference requires sufficient account balance/allowance.
+- Invalid mission budgets from a Venice plan: reject the plan and return a fallback generated by core policy helpers.
+
+## Live Smoke Diagnosis - 2026-05-31
+
+- `.env.local` was present and `VENICE_API_KEY` was configured; no key value was printed.
+- `GET /models?type=text` and `GET /models/traits?type=text` returned HTTP 200, so the key appears valid for safe metadata endpoints.
+- The selected model `zai-org-glm-5-1` exists in the model list.
+- `GET /billing/balance` returned HTTP 200 with `canConsume: false`.
+- Chat completion calls returned sanitized HTTP 402 diagnostics categorized as `credits_billing`.
+- Current conclusion: the adapter request format and selected model are not the blocker. The likely blocker is insufficient Venice balance/credits for live inference. Keep fallback behavior intact until the account has credits/allowance.
 
 ## Implementation Research Rule
 
-- Status: not implemented yet.
-- Source of truth: official Venice AI docs, Context7 if available, and installed package/source types for any selected client.
-- Verify before implementation: OpenAI-compatible base URL, auth headers, current model names, structured output support, rate limits, and fallback behavior.
+- Status: Phase 2 adapter implementation in progress.
+- Source of truth: official Venice AI docs and installed OpenAI package source/types.
+- Verify before implementation: base URL, auth headers, current model names, structured output behavior, error handling, and fallback behavior.
 - Role in TaskMarket402: mission planning, specialist-output verification, and final report synthesis.
-- Known uncertainties: recommended models, structured output guarantees, and exact error/rate-limit behavior.
+- Known uncertainties: live Venice model behavior for `response_format` after credits are added, exact structured-output strictness across models, current account-specific rate limits, and whether `zai-org-glm-5-1` remains the best demo model after a successful live inference run.
