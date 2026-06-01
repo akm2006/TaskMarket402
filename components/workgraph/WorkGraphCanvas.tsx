@@ -27,9 +27,11 @@ type AuditNodeData = WorkGraphNode & {
 type AuditFlowNode = Node<AuditNodeData>;
 
 const NODE_WIDTH = 260;
-const NODE_HEIGHT = 154;
+const NODE_HEIGHT = 172;
 const COLUMN_GAP = 295;
-const ROW_GAP = 180;
+const ROW_GAP = 205;
+const fitViewOptions = { padding: 0.18 };
+const defaultEdgeOptions = { type: "smoothstep" };
 
 const layeredPositions: Record<string, { column: number; row: number }> = {
   "mission-budget": { column: 0, row: 1 },
@@ -123,12 +125,12 @@ function getNodeText(node: WorkGraphNode): Pick<AuditNodeData, "eyebrow" | "prim
       return {
         eyebrow: metadata.subBudget ?? "Sub-budget",
         primary: metadata.output ?? "Mock specialist output",
-        secondary: "Typed mock output"
+        secondary: metadata.paymentMode ?? metadata.source ?? "Typed mock output"
       };
     case "x402-payment":
       return {
         eyebrow: metadata.amount ?? "0.40 USDC",
-        primary: "Mock 402 challenge",
+        primary: metadata.status ?? "x402 payment state",
         secondary: metadata.resource ?? "Specialist resource"
       };
     case "oneshot-relay":
@@ -139,15 +141,15 @@ function getNodeText(node: WorkGraphNode): Pick<AuditNodeData, "eyebrow" | "prim
       };
     case "venice-verification":
       return {
-        eyebrow: "Verification placeholder",
-        primary: metadata.status ?? "Mock verifier pass",
-        secondary: metadata.implementation ?? "Phase 1 UI mock"
+        eyebrow: "AI verification",
+        primary: metadata.status ?? "Provider-layer verification",
+        secondary: metadata.implementation ?? "Venice/Gemini/mock provider state shown after runtime run"
       };
     case "final-report":
       return {
-        eyebrow: "Report shell",
-        primary: metadata.status ?? "Placeholder",
-        secondary: metadata.synthesis ?? "Awaiting synthesis"
+        eyebrow: "Mission result",
+        primary: metadata.status ?? "Final report",
+        secondary: metadata.synthesis ?? "Awaiting AI synthesis"
       };
     case "blocked-payment":
       return {
@@ -164,14 +166,39 @@ function getNodeText(node: WorkGraphNode): Pick<AuditNodeData, "eyebrow" | "prim
   }
 }
 
+function nodeBadges(node: AuditNodeData): string[] {
+  const metadata = node.metadata ?? {};
+  const badges: string[] = [];
+
+  if (metadata.paymentMode) {
+    badges.push(metadata.paymentMode);
+  }
+
+  if (metadata.outputMode) {
+    badges.push(metadata.outputMode);
+  }
+
+  if (metadata.aiMode) {
+    badges.push(metadata.aiMode);
+  }
+
+  if (metadata.proofState) {
+    badges.push(metadata.proofState);
+  }
+
+  return badges.slice(0, 2);
+}
+
 function AuditGraphNode({ data }: NodeProps<AuditNodeData>) {
+  const badges = nodeBadges(data);
+
   return (
     <div
-      className={`audit-node h-[154px] w-[260px] rounded-lg border p-4 text-left shadow-2xl ${nodeThemes[data.category]}`}
+      className={`audit-node h-[172px] w-[260px] rounded-lg border p-4 text-left shadow-2xl ${nodeThemes[data.category]}`}
       data-testid={`workgraph-node-${data.id}`}
     >
       <Handle className="audit-handle" type="target" position={Position.Left} />
-      <div className="flex h-full flex-col justify-between gap-4">
+      <div className="flex h-full flex-col justify-between gap-3">
         <div>
           <div className="flex items-center justify-between gap-3">
             <span className="rounded border border-white/20 bg-black/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide">
@@ -182,6 +209,18 @@ function AuditGraphNode({ data }: NodeProps<AuditNodeData>) {
             </span>
           </div>
           <h3 className="mt-3 text-xl font-semibold leading-tight">{data.label}</h3>
+          {badges.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {badges.map((badge) => (
+                <span
+                  key={badge}
+                  className="rounded border border-white/15 bg-black/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div>
           <p className="text-base font-semibold leading-5">{data.primary}</p>
@@ -223,6 +262,7 @@ function edgeTone(edge: WorkGraph["edges"][number]) {
 }
 
 export function WorkGraphCanvas({ graph }: { graph: WorkGraph }) {
+  const stableNodeTypes = useMemo(() => nodeTypes, []);
   const [selectedNode, setSelectedNode] = useState<AuditNodeData>(() => {
     const firstNode = graph.nodes[0];
     return {
@@ -281,12 +321,12 @@ export function WorkGraphCanvas({ graph }: { graph: WorkGraph }) {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          nodeTypes={nodeTypes}
+          nodeTypes={stableNodeTypes}
           fitView
-          fitViewOptions={{ padding: 0.16 }}
+          fitViewOptions={fitViewOptions}
           minZoom={0.24}
           maxZoom={1.15}
-          defaultEdgeOptions={{ type: "smoothstep" }}
+          defaultEdgeOptions={defaultEdgeOptions}
           onlyRenderVisibleElements={false}
           nodesDraggable={false}
           nodesConnectable={false}

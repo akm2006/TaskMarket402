@@ -57,7 +57,7 @@ const workGraph: WorkGraph = {
       budget: "3.00 USDC",
       maxPerAgent: "0.50 USDC",
       scope: "Wallet / Token Risk Report",
-      mode: "Mock Phase 1 state"
+      mode: "Hybrid demo baseline"
     }),
     node("manager-agent", "Manager Agent", "agent", "running", {
       objective: "Split mission budget into bounded specialist work.",
@@ -66,41 +66,52 @@ const workGraph: WorkGraph = {
     }),
     node("contract-scanner", "Contract Scanner Agent", "agent", "completed", {
       subBudget: "0.40 USDC",
-      output: "Mock contract risk summary",
-      source: "Typed mock output"
+      output: "Real-data contract analysis",
+      source: "Server-side specialist agent",
+      paymentMode: "real x402 capable",
+      outputMode: "real-data output"
     }),
     node("wallet-behavior", "Wallet Behavior Agent", "agent", "completed", {
       subBudget: "0.35 USDC",
-      output: "Mock wallet behavior summary",
-      source: "Typed mock output"
+      output: "Wallet behavior analysis",
+      source: "Server-side specialist agent",
+      paymentMode: "simulated payment",
+      outputMode: "real-data or fallback output"
     }),
     node("market-context", "Market Context Agent", "agent", "completed", {
       subBudget: "0.25 USDC",
-      output: "Mock liquidity and market context",
-      source: "Typed mock output"
+      output: "Market context analysis",
+      source: "Server-side specialist agent",
+      paymentMode: "simulated payment",
+      outputMode: "real-data or fallback output"
     }),
     node("x402-payment", "x402 Payment Node", "payment", "payment_required", {
       amount: "0.40 USDC",
       resource: "Contract Scanner report",
-      implementation: "Mock 402 challenge only"
+      status: "Contract Scanner real x402",
+      implementation: "Phase 5 Base Sepolia path is live-proven when runtime/env are configured",
+      paymentMode: "real x402"
     }),
     node("oneshot-relay", "1Shot Relay Status", "relay", "planned", {
       status: "Future real relay proof",
       currentState: "Not implemented in Phase 1",
       reason: "Sponsor integration deferred"
     }),
-    node("venice-verification", "Venice Verification", "verification", "verified", {
-      status: "Mock verifier pass",
-      implementation: "Phase 1 UI mock; Phase 2 server adapter is separate"
+    node("venice-verification", "AI Verification Layer", "verification", "verified", {
+      status: "Provider-layer verification",
+      implementation: "Venice remains official sponsor path; Gemini/mock can appear only as provider-labeled fallback/dev states",
+      aiMode: "AI verified or fallback"
     }),
     node("final-report", "Final Report", "report", "planned", {
-      status: "Placeholder",
-      synthesis: "Phase 1 placeholder, not a live Venice report"
+      status: "Synthesized mission result",
+      synthesis: "Server runtime can synthesize from specialist outputs through the provider-neutral AI layer",
+      aiMode: "final report ready"
     }),
     node("blocked-payment", "Blocked Payment Demo", "payment", "blocked", {
       attemptedAmount: "0.80 USDC",
       maxPerAgent: "0.50 USDC",
-      reason: "Policy rejected spend above per-agent cap"
+      reason: "Policy rejected spend above per-agent cap",
+      proofState: "policy enforced"
     })
   ],
   edges: [
@@ -162,8 +173,8 @@ const events: WorkGraphEvent[] = [
     id: "event-003",
     occurredAt: "09:30:08",
     actor: "Contract Scanner",
-    title: "Payment required",
-    detail: "Mock x402 payment challenge recorded for a 0.40 USDC report resource.",
+    title: "x402 payment boundary",
+    detail: "Contract Scanner owns the real x402 path in Phase 5; Wallet Behavior and Market Context remain simulated/dev payment.",
     status: "payment_required",
     relatedNodeId: "x402-payment"
   },
@@ -179,9 +190,9 @@ const events: WorkGraphEvent[] = [
   {
     id: "event-005",
     occurredAt: "09:30:18",
-    actor: "Mock Verification",
-    title: "Outputs accepted",
-    detail: "Typed mock outputs were accepted for the Phase 1 report placeholder; this is not live Venice verification.",
+    actor: "AI Runtime",
+    title: "Verification layer ready",
+    detail: "Runtime results label Venice, Gemini, or mock/fallback states explicitly; credits-billing fallback is not presented as live Venice inference.",
     status: "verified",
     relatedNodeId: "venice-verification"
   }
@@ -190,7 +201,7 @@ const events: WorkGraphEvent[] = [
 const finalReport: FinalReportPlaceholder = {
   title: "Wallet / Token Risk Report",
   status: "placeholder",
-  summary: "Phase 1 renders the report shell and audit trail. This snapshot remains mock-only; live Venice synthesis is handled by the server adapter when wired into a runtime flow.",
+  summary: "The static snapshot anchors the audit trail. The server runtime can now show provider-labeled AI planning, verification, and final report synthesis without changing wallet or payment execution.",
   sections: [
     {
       heading: "Budget Trail",
@@ -198,11 +209,11 @@ const finalReport: FinalReportPlaceholder = {
     },
     {
       heading: "Specialist Outputs",
-      body: "Contract, wallet behavior, and market context summaries are typed mock outputs only."
+      body: "Contract Scanner can run behind the real x402 path; Wallet Behavior and Market Context intentionally stay on simulated/dev payment for this phase."
     },
     {
       heading: "Deferred Integrations",
-      body: "MetaMask, x402 settlement, 1Shot relay, Venice synthesis, and Supabase persistence remain behind placeholders."
+      body: "MetaMask, ERC-7710, 1Shot relay, wallet UI, and Supabase persistence remain out of scope for Phase 6."
     }
   ]
 };

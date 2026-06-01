@@ -285,3 +285,29 @@
 - Commands run: sanitized `.env.local` check, `netstat -ano | findstr :3000`, temporary `pnpm dev --hostname 127.0.0.1 --port 3000`, `pnpm smoke:x402`, `Stop-Process` for the temporary server, port cleanup verification, and the full verification suite.
 - Warning: an initial combined server/smoke/cleanup wrapper had a PowerShell cleanup variable error after the smoke had passed; the smoke was rerun standalone and passed cleanly, and the temporary server was stopped.
 - Next recommended prompt: "Prepare a commit that labels Contract Scanner as live x402 while keeping MetaMask/ERC-7710/1Shot/Supabase out of scope."
+
+## 2026-06-01 - Phase 6 Hybrid Payment Demo UI Hardening
+
+- Built Phase 6 only: improved the WorkGraph and mission AI runtime UI for the current hybrid payment state.
+- No MetaMask, ERC-7710, 1Shot, Supabase, wallet UI, or real x402 for Wallet Behavior/Market Context was added.
+- Used `demo-hardening`, `workgraph-ui-builder`, `runtime-verification`, `AGENTS.md`, `docs/research/x402.md`, and `graphify-out/GRAPH_REPORT.md`.
+- Checked current React Flow docs through Context7 and confirmed the stable `nodeTypes`/`edgeTypes` guidance, `fitView`, `Background`, `Controls`, and `MiniMap` usage.
+- Updated the static WorkGraph copy/metadata so the demo communicates:
+  - Contract Scanner is the real x402-capable specialist path;
+  - Wallet Behavior and Market Context remain simulated/dev payment;
+  - AI verification/report synthesis are provider-layer states;
+  - blocked payment remains the policy-enforcement branch.
+- Updated the mission AI runtime panel with clear badges for real x402, simulated/dev payment, real-data output, fallback output, AI verified, AI fallback, and final report readiness.
+- Added a compact audit timeline that shows `payment_required`, `real_x402_paid` or `simulated_payment_used`, `agent_output_returned`, `ai_verified`, and `final_report_ready`.
+- Updated Playwright smoke coverage so mocked runtime UI proves:
+  - Contract Scanner shows `Real x402 paid agent`;
+  - Wallet Behavior and Market Context show `Simulated/dev paid agent`;
+  - simulated agents do not display the real x402 paid badge;
+  - AI provider state and AI verification state are visible.
+- Commands run: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:e2e`, `pnpm verify`, `pnpm build`, `pnpm smoke:gemini`, `pnpm smoke:venice`, temporary local `pnpm dev --hostname 127.0.0.1 --port 3000`, sanitized localhost route probe, and `pnpm smoke:x402`.
+- Validation result: lint, typecheck, unit tests, e2e tests, verify, build, Gemini smoke, Venice smoke, and live x402 smoke passed.
+- Live x402 smoke result: readiness passed on Base Sepolia with buyer public address `0xcC9682120BC59a4B38aFD40c6c1b37Bab551370b`; final rerun returned `real_x402_paid`, response status `200`, settlement present `true`, and transaction present `true`.
+- Warning: the first live `pnpm smoke:x402` run failed with sanitized `request` / `SyntaxError` after readiness passed. A sanitized localhost route probe showed HTTP 402 JSON with `PAYMENT-REQUIRED`, then the smoke rerun passed. Treat this as transient x402/facilitator/client parsing instability unless it repeats.
+- Remaining warning: React Flow still logs the dev-server `nodeTypes/edgeTypes` warning in Playwright even after module-scoped and memoized node type references; tests pass. A larger no-custom-node refactor could remove the prop entirely if this warning becomes demo-blocking.
+- Remaining limitations: Contract Scanner is the only real x402 specialist path. Wallet Behavior and Market Context remain simulated/dev payment. Venice live inference remains `credits_billing` fallback. MetaMask, ERC-7710, 1Shot, Supabase, and wallet UI remain out of scope.
+- Next recommended prompt: "Create the Phase 6 UI checkpoint commit after reviewing the browser screen once, then plan the MetaMask/ERC-7710/1Shot golden-path phase without changing Wallet Behavior or Market Context payment mode."
