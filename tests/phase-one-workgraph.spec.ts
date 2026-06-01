@@ -216,7 +216,7 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
     await page.getByTestId("run-ai-analysis").click();
 
     await expect(page.getByTestId("ai-runtime-result")).toBeVisible();
-    await expect(page.getByTestId("paid-agent-flow")).toContainText("x402-style dev payment flow");
+    await expect(page.getByTestId("paid-agent-flow")).toContainText("Specialist paid-agent flow");
     await expect(page.getByTestId("paid-agent-flow")).toContainText("simulated");
     await expect(page.getByTestId("specialist-data-outputs")).toContainText("real-data");
     await expect(page.getByTestId("specialist-data-outputs")).toContainText("fallback");

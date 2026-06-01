@@ -1,4 +1,9 @@
 import {
+  payContractScannerWithX402,
+  type X402ContractScannerPaymentResult
+} from "../adapters/payment/x402-client";
+import {
+  contractScannerX402Mode,
   createDevPaymentSignature,
   createX402ProtectedResource,
   verifyDevPaymentProof,
@@ -9,8 +14,16 @@ import type { SpecialistAgentKind } from "../agents/types";
 import { outputWithSource } from "../agents/types";
 import type { AgentTask, Mission, MissionRunSnapshot } from "../core/types";
 
-export type PaidAgentPaymentEventType = "payment_required" | "dev_payment_accepted" | "agent_output_returned";
-export type PaidAgentFlow = "direct_agents" | "x402_style_dev";
+export type PaidAgentPaymentEventType =
+  | "payment_required"
+  | "dev_payment_accepted"
+  | "real_x402_payment_required"
+  | "real_x402_paid"
+  | "real_x402_failed"
+  | "real_x402_unavailable"
+  | "simulated_payment_used"
+  | "agent_output_returned";
+export type PaidAgentFlow = "direct_agents" | "x402_style_dev" | "x402_contract_scanner_real";
 
 export interface PaidAgentPaymentEvent {
   id: string;
@@ -23,17 +36,21 @@ export interface PaidAgentPaymentEvent {
   amount: string;
   currency: "USDC";
   occurredAt: string;
-  simulatedSettlement: true;
+  simulatedSettlement: boolean;
 }
 
 export interface PaidAgentFlowResult {
-  flow: "x402_style_dev";
+  flow: "x402_style_dev" | "x402_contract_scanner_real";
   runs: SpecialistAgentRun[];
   paymentEvents: PaidAgentPaymentEvent[];
 }
 
 export interface PaidAgentFlowOptions extends SpecialistAgentOptions {
   now?: () => string;
+  contractScannerBuyer?: (
+    payload: { targetAddress: string },
+    options?: Parameters<typeof payContractScannerWithX402>[1]
+  ) => Promise<X402ContractScannerPaymentResult>;
 }
 
 const specialistKinds: SpecialistAgentKind[] = ["contract_scanner", "wallet_behavior", "market_context"];
@@ -87,7 +104,8 @@ function paymentEvent(
   type: PaidAgentPaymentEventType,
   title: string,
   detail: string,
-  now: () => string
+  now: () => string,
+  simulatedSettlement = true
 ): PaidAgentPaymentEvent {
   return {
     id: `${resource.resourceId}:${type}`,
@@ -100,7 +118,25 @@ function paymentEvent(
     amount: resource.price,
     currency: resource.task.budget.currency,
     occurredAt: now(),
-    simulatedSettlement: true
+    simulatedSettlement
+  };
+}
+
+function priceAmount(value: string | undefined, fallback: string): string {
+  if (!value?.trim()) {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  const normalized = trimmed.startsWith(".") ? `0${trimmed}` : trimmed;
+
+  return normalized.charCodeAt(0) === 36 ? normalized.slice(1) : normalized;
+}
+
+function resourceWithPrice(resource: X402ProtectedResource, price: string): X402ProtectedResource {
+  return {
+    ...resource,
+    price
   };
 }
 
@@ -141,18 +177,103 @@ export async function runPaidSpecialistAgentsWithDevPayment(
   const now = options.now ?? (() => new Date().toISOString());
   const runs: SpecialistAgentRun[] = [];
   const paymentEvents: PaidAgentPaymentEvent[] = [];
+  let flow: PaidAgentFlowResult["flow"] = "x402_style_dev";
 
   for (const agentKind of specialistKinds) {
-    const resource = createPaidAgentResource(snapshot, agentKind, `internal://taskmarket402/api/agents/${specialistAgentSlug(agentKind)}`);
-    paymentEvents.push(
-      paymentEvent(
+    const baseResourceUrl =
+      agentKind === "contract_scanner" && options.env?.X402_CONTRACT_SCANNER_URL
+        ? options.env.X402_CONTRACT_SCANNER_URL
+        : `internal://taskmarket402/api/agents/${specialistAgentSlug(agentKind)}`;
+    const resource = createPaidAgentResource(snapshot, agentKind, baseResourceUrl);
+
+    if (agentKind === "contract_scanner" && contractScannerX402Mode(options.env) === "real") {
+      flow = "x402_contract_scanner_real";
+      const realResource = resourceWithPrice(
         resource,
-        "payment_required",
-        "Payment required",
-        "x402-style development challenge created before specialist output is returned.",
-        now
-      )
-    );
+        priceAmount(options.env?.X402_CONTRACT_SCANNER_PRICE_USD, resource.price)
+      );
+
+      paymentEvents.push(
+        paymentEvent(
+          realResource,
+          "real_x402_payment_required",
+          "Real x402 payment required",
+          "Contract Scanner attempted the real x402 buyer/seller/facilitator path.",
+          now,
+          false
+        )
+      );
+
+      const buyer = options.contractScannerBuyer ?? payContractScannerWithX402;
+      const realPayment = await buyer(
+        {
+          targetAddress: snapshot.mission.targetAddress
+        },
+        {
+          env: options.env
+        }
+      );
+
+      if (realPayment.state === "real_x402_paid" && realPayment.specialistRun) {
+        runs.push(realPayment.specialistRun);
+        paymentEvents.push(
+          paymentEvent(
+            realResource,
+            "real_x402_paid",
+            "Real x402 paid",
+            realPayment.transactionPresent
+              ? "Contract Scanner settled through x402 and returned a specialist output."
+              : "Contract Scanner returned a settled x402 response; transaction details are kept server-side.",
+            now,
+            false
+          )
+        );
+        paymentEvents.push(
+          paymentEvent(
+            realResource,
+            "agent_output_returned",
+            "Agent output returned",
+            "Contract Scanner returned output after real x402 settlement.",
+            now,
+            false
+          )
+        );
+        continue;
+      }
+
+      paymentEvents.push(
+        paymentEvent(
+          realResource,
+          realPayment.state === "real_x402_unavailable" ? "real_x402_unavailable" : "real_x402_failed",
+          realPayment.state === "real_x402_unavailable" ? "Real x402 unavailable" : "Real x402 failed",
+          realPayment.failureCategory
+            ? `Real x402 did not produce settled output; sanitized category: ${realPayment.failureCategory}.`
+            : "Real x402 did not produce settled output.",
+          now,
+          false
+        )
+      );
+      paymentEvents.push(
+        paymentEvent(
+          resource,
+          "simulated_payment_used",
+          "Simulated fallback used",
+          "Contract Scanner fell back to the existing simulated/dev paid-agent path after real x402 was unavailable.",
+          now,
+          true
+        )
+      );
+    } else {
+      paymentEvents.push(
+        paymentEvent(
+          resource,
+          "payment_required",
+          "Payment required",
+          "x402-style development challenge created before specialist output is returned.",
+          now
+        )
+      );
+    }
 
     const headers = new Headers({
       "PAYMENT-SIGNATURE": createDevPaymentSignature(resource, options.env)
@@ -174,7 +295,8 @@ export async function runPaidSpecialistAgentsWithDevPayment(
         "dev_payment_accepted",
         "Development payment accepted",
         "Development-only proof accepted; no real x402 settlement occurred.",
-        now
+        now,
+        true
       )
     );
 
@@ -186,13 +308,14 @@ export async function runPaidSpecialistAgentsWithDevPayment(
         "agent_output_returned",
         "Agent output returned",
         `${agentKind.replaceAll("_", " ")} returned a ${run.source} output after simulated payment acceptance.`,
-        now
+        now,
+        true
       )
     );
   }
 
   return {
-    flow: "x402_style_dev",
+    flow,
     runs,
     paymentEvents
   };

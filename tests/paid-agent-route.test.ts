@@ -6,6 +6,7 @@ import { createPaidAgentResource } from "../lib/runtime/paid-agent-flow";
 
 const originalDevProof = process.env.X402_DEV_PAYMENT_PROOF;
 const originalDevMode = process.env.X402_DEV_MODE;
+const originalContractScannerMode = process.env.X402_CONTRACT_SCANNER_MODE;
 
 function routeContext(agentKind = "contract-scanner") {
   return {
@@ -27,12 +28,19 @@ afterEach(() => {
   } else {
     process.env.X402_DEV_MODE = originalDevMode;
   }
+
+  if (originalContractScannerMode === undefined) {
+    delete process.env.X402_CONTRACT_SCANNER_MODE;
+  } else {
+    process.env.X402_CONTRACT_SCANNER_MODE = originalContractScannerMode;
+  }
 });
 
 describe("paid specialist-agent API route", () => {
   it("returns an x402-style 402 challenge without payment proof", async () => {
     process.env.X402_DEV_PAYMENT_PROOF = "route-test-proof";
     process.env.X402_DEV_MODE = "true";
+    process.env.X402_CONTRACT_SCANNER_MODE = "simulated";
 
     const response = await POST(
       new Request("http://localhost:3000/api/agents/contract-scanner", {
@@ -53,6 +61,7 @@ describe("paid specialist-agent API route", () => {
   it("returns a safe 402 response for invalid development proof", async () => {
     process.env.X402_DEV_PAYMENT_PROOF = "route-test-proof";
     process.env.X402_DEV_MODE = "true";
+    process.env.X402_CONTRACT_SCANNER_MODE = "simulated";
 
     const response = await POST(
       new Request("http://localhost:3000/api/agents/contract-scanner", {
@@ -73,6 +82,7 @@ describe("paid specialist-agent API route", () => {
   it("returns typed specialist output when development proof is accepted", async () => {
     process.env.X402_DEV_PAYMENT_PROOF = "route-test-proof";
     process.env.X402_DEV_MODE = "true";
+    process.env.X402_CONTRACT_SCANNER_MODE = "simulated";
 
     const url = "http://localhost:3000/api/agents/contract-scanner";
     const resource = createPaidAgentResource(phaseOneDemoSnapshot, "contract_scanner", url);

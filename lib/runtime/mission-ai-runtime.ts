@@ -77,7 +77,7 @@ export interface MissionAiPaymentEventDto {
   amount: string;
   currency: "USDC";
   occurredAt: string;
-  simulatedSettlement: true;
+  simulatedSettlement: boolean;
 }
 
 export interface MissionAiRuntimeResponse {

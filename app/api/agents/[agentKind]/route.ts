@@ -1,9 +1,15 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
+  contractScannerX402Mode,
+  createContractScannerRouteConfig,
+  createContractScannerX402ResourceServer,
   createPaymentResponseHeader,
   createX402PaymentRequired,
+  resolveContractScannerSellerConfig,
   verifyDevPaymentProof
 } from "../../../../lib/adapters/payment/x402-server";
+import type { SpecialistAgentKind } from "../../../../lib/agents/types";
 import { phaseOneDemoSnapshot } from "../../../../lib/core/phase-one-demo";
 import {
   createPaidAgentResource,
@@ -22,6 +28,8 @@ interface PaidAgentRequestBody {
   targetAddress?: string;
 }
 
+type PaidAgentRouteMode = "phase-4-dev" | "phase-5-real-x402";
+
 async function readBody(request: Request): Promise<PaidAgentRequestBody> {
   try {
     const body = (await request.json()) as PaidAgentRequestBody;
@@ -32,34 +40,34 @@ async function readBody(request: Request): Promise<PaidAgentRequestBody> {
   }
 }
 
-export async function POST(request: Request, context: PaidAgentRouteContext) {
-  const params = await context.params;
-  const agentKindSlug =
-    typeof params === "object" && params !== null && "agentKind" in params
-      ? String(params.agentKind)
-      : "";
-  const agentKind = specialistAgentKindFromSlug(agentKindSlug);
+function missionFromBody(body: PaidAgentRequestBody) {
+  return typeof body.targetAddress === "string" && body.targetAddress.length > 0
+    ? {
+        ...phaseOneDemoSnapshot.mission,
+        targetAddress: body.targetAddress
+      }
+    : phaseOneDemoSnapshot.mission;
+}
 
-  if (!agentKind) {
-    return NextResponse.json({ error: "Specialist agent not found." }, { status: 404 });
-  }
-
-  const body = await readBody(request);
-  const mission =
-    typeof body.targetAddress === "string" && body.targetAddress.length > 0
-      ? {
-          ...phaseOneDemoSnapshot.mission,
-          targetAddress: body.targetAddress
-        }
-      : phaseOneDemoSnapshot.mission;
+async function handlePaidAgentRequest(
+  request: Request,
+  agentKind: SpecialistAgentKind,
+  mode: PaidAgentRouteMode,
+  bodyOverride?: PaidAgentRequestBody
+) {
+  const body = bodyOverride ?? (await readBody(request));
+  const mission = missionFromBody(body);
   const snapshot = {
     ...phaseOneDemoSnapshot,
     mission
   };
   const resource = createPaidAgentResource(snapshot, agentKind, request.url);
-  const verification = verifyDevPaymentProof(request.headers, resource, process.env);
+  const simulatedSettlement = mode === "phase-4-dev";
+  const verification = simulatedSettlement
+    ? verifyDevPaymentProof(request.headers, resource, process.env)
+    : undefined;
 
-  if (!verification.ok) {
+  if (verification && !verification.ok) {
     return createX402PaymentRequired(resource, {
       env: process.env,
       reason: verification.reason
@@ -69,41 +77,112 @@ export async function POST(request: Request, context: PaidAgentRouteContext) {
   const specialistRun = await runPaidAgentAfterAcceptedPayment(mission, agentKind, {
     env: process.env
   });
+  const headers: Record<string, string> = {
+    "Cache-Control": "no-store"
+  };
+  const realPrice = process.env.X402_CONTRACT_SCANNER_PRICE_USD?.trim();
+  const normalizedRealPrice = realPrice?.startsWith(".") ? `0${realPrice}` : realPrice;
+  const paymentAmount =
+    !simulatedSettlement && normalizedRealPrice
+      ? normalizedRealPrice.charCodeAt(0) === 36
+        ? normalizedRealPrice.slice(1)
+        : normalizedRealPrice
+      : resource.price;
+
+  if (verification?.ok) {
+    headers["PAYMENT-RESPONSE"] = createPaymentResponseHeader(resource, verification, process.env);
+  }
 
   return NextResponse.json(
     {
       source: "paid_agent_endpoint",
-      phase: "phase-4-dev",
-      simulatedSettlement: true,
+      phase: mode,
+      simulatedSettlement,
       agentKind,
       payment: {
-        state: verification.state,
-        mode: "dev",
-        settlement: "simulated",
-        paymentId: verification.paymentId,
+        state: simulatedSettlement ? verification?.state : "real_x402_paid",
+        mode: simulatedSettlement ? "dev" : "live",
+        settlement: simulatedSettlement ? "simulated" : "settled",
+        paymentId: verification?.ok ? verification.paymentId : undefined,
         resourceId: resource.resourceId,
-        amount: resource.price,
+        amount: paymentAmount,
         currency: resource.task.budget.currency
       },
       events: [
         {
-          type: "dev_payment_accepted",
+          type: simulatedSettlement ? "dev_payment_accepted" : "real_x402_paid",
           resourceId: resource.resourceId,
-          simulatedSettlement: true
+          simulatedSettlement
         },
         {
           type: "agent_output_returned",
           resourceId: resource.resourceId,
-          simulatedSettlement: true
+          simulatedSettlement
         }
       ],
       specialistRun
     },
     {
-      headers: {
-        "Cache-Control": "no-store",
-        "PAYMENT-RESPONSE": createPaymentResponseHeader(resource, verification, process.env)
-      }
+      headers
     }
   );
+}
+
+async function handleRealContractScannerRequest(request: Request) {
+  const configResult = resolveContractScannerSellerConfig(process.env);
+
+  if (!configResult.ok) {
+    return NextResponse.json(
+      {
+        source: "paid_agent_endpoint",
+        phase: "phase-5-real-x402",
+        simulatedSettlement: false,
+        payment: {
+          state: "real_x402_unavailable",
+          settlement: "unavailable",
+          missing: configResult.missing,
+          invalid: configResult.invalid
+        }
+      },
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-store"
+        }
+      }
+    );
+  }
+
+  const body = await readBody(request.clone());
+  const { withX402 } = await import("@x402/next");
+  const protectedHandler = withX402(
+    async (protectedRequest: NextRequest) =>
+      (await handlePaidAgentRequest(
+        protectedRequest,
+        "contract_scanner",
+        "phase-5-real-x402",
+        body
+      )) as NextResponse,
+    createContractScannerRouteConfig(configResult.config),
+    createContractScannerX402ResourceServer(configResult.config)
+  );
+
+  return protectedHandler(request as NextRequest);
+}
+
+export async function POST(request: Request, context: PaidAgentRouteContext) {
+  const params = await context.params;
+  const agentKindSlug =
+    typeof params === "object" && params !== null && "agentKind" in params ? String(params.agentKind) : "";
+  const agentKind = specialistAgentKindFromSlug(agentKindSlug);
+
+  if (!agentKind) {
+    return NextResponse.json({ error: "Specialist agent not found." }, { status: 404 });
+  }
+
+  if (agentKind === "contract_scanner" && contractScannerX402Mode(process.env) === "real") {
+    return handleRealContractScannerRequest(request);
+  }
+
+  return handlePaidAgentRequest(request, agentKind, "phase-4-dev");
 }

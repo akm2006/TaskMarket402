@@ -236,3 +236,52 @@
 - Smoke status: Gemini currently returns sanitized HTTP 429 `rate_limit` fallback diagnostics; Venice auth/model checks pass but live inference remains blocked by HTTP 402 `credits_billing` / `canConsume=false`.
 - Remaining limitations: this is an x402-style simulated settlement only. Real `@x402/*` packages, facilitator verification, wallet signing, ERC-7710, MetaMask permissions, 1Shot relay/status, and onchain settlement remain future phases.
 - Next recommended prompt: "Build the real x402 Contract Scanner path only after re-reading current x402, ERC-7710, MetaMask, Base, and 1Shot docs; replace the simulated proof boundary with real buyer/seller/facilitator behavior without changing core policy authority."
+
+## 2026-06-01 - Phase 5 Real x402 Contract Scanner Golden Path
+
+- Built Phase 5 only: added a real x402 buyer/seller/facilitator path for Contract Scanner only.
+- No MetaMask, ERC-7710, 1Shot, wallet UI, Supabase, Wallet Behavior real x402, Market Context real x402, or onchain delegation code was added.
+- Used `sponsor-docs-rag`, `research-gated-implementation`, `integration-spine-builder`, `runtime-verification`, `AGENTS.md`, `docs/research/x402.md`, and `graphify-out/GRAPH_REPORT.md`.
+- Readiness result before implementation: `.env.local` existed; buyer public address derived; network was `eip155:84532`; buyer Base Sepolia ETH was positive; buyer Base Sepolia USDC was enough for `X402_CONTRACT_SCANNER_PRICE_USD`; seller address was valid; facilitator URL was configured; Contract Scanner URL was absolute.
+- Readiness warning: local `http://localhost:3000/api/agents/contract_scanner` was not reachable during the initial check because the local Next server was not running.
+- Re-read official x402 seller/buyer/facilitator/network docs and inspected installed package types/source before coding.
+- Installed only the needed x402 packages: `@x402/next@2.14.0`, `@x402/core@2.14.0`, `@x402/evm@2.14.0`, and `@x402/fetch@2.14.0`.
+- Updated `docs/research/x402.md` with the verified package/API shape, Base Sepolia assumptions, env vars, smoke expectations, and Phase 5 limitations.
+- Added real seller config helpers and x402 route config/server construction in `lib/adapters/payment/x402-server.ts`.
+- Added real buyer config validation and server-only `payContractScannerWithX402()` in `lib/adapters/payment/x402-client.ts`; failures return sanitized states without secrets, headers, signed payloads, or raw facilitator responses.
+- Updated `POST /api/agents/[agentKind]` so only `contract_scanner` uses `withX402` when `X402_CONTRACT_SCANNER_MODE=real`; other agents remain on Phase 4 simulated/dev proof.
+- Updated the mission paid-agent runtime to emit `real_x402_payment_required`, `real_x402_paid`, `real_x402_failed`, `real_x402_unavailable`, and `simulated_payment_used` events.
+- Updated the mission AI runtime DTO and UI labels so Contract Scanner can be shown as real x402 while Wallet Behavior and Market Context remain simulated/dev payment.
+- Added `pnpm smoke:x402` with `scripts/smoke-x402.test.ts`; it requires `X402_LIVE_SMOKE=true` for live settlement and otherwise skips safely.
+- Updated `.env.example` with safe x402 variable names/defaults only. No secrets were added.
+- Added price normalization and `.env.example` guidance because Next dotenv can treat an unescaped `$0.001` as variable expansion; plain `0.001` or escaped `\$0.001` should be used.
+- Added mocked unit coverage for real-mode config validation, missing buyer key fallback, malformed response fallback, settlement/insufficient-funds fallback, request failure fallback, simulated fallback, and runtime behavior with Contract Scanner real plus other agents simulated.
+- Commands run: `pnpm add @x402/next @x402/core @x402/evm @x402/fetch`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:e2e`, `pnpm verify`, `pnpm build`, `pnpm smoke:gemini`, `pnpm smoke:venice`, `pnpm smoke:x402`, temporary local route reachability checks, and `graphify update .`.
+- Validation result: all requested checks passed.
+- Smoke results: `pnpm smoke:x402` skipped live settlement because `X402_LIVE_SMOKE` was not true; Gemini live smoke completed with `gemini-2.5-flash`; Venice auth/model checks passed but live inference remains blocked by HTTP 402 `credits_billing` / `canConsume=false`.
+- Route reachability result: after price normalization, temporary local dev-server probe returned HTTP 402 with `PAYMENT-REQUIRED` present and `real_x402_payment_required`.
+- Errors/warnings: `pnpm smoke:x402` initially hit a Windows sandbox spawn setup issue and passed after approved rerun. Initial unit test import of `@x402/next` exposed a Vitest/Next ESM import issue, so the `@x402/next` import is dynamic and only loads in the real Contract Scanner branch. A temporary route reachability check showed `X402_CONTRACT_SCANNER_PRICE_USD` invalid when Next expanded an unescaped `$0.001`; price normalization and env guidance were added. A parallel `pnpm lint` run raced with Playwright cleanup and failed on missing `test-results`; sequential rerun passed. Playwright still reports the existing React Flow dev-server `nodeTypes/edgeTypes` warning while tests pass. pnpm continued to warn that `sharp` and `unrs-resolver` build scripts were ignored.
+- Remaining limitation: real x402 settlement has not been live-proven because `X402_LIVE_SMOKE=false`; enable the flag and run the smoke while the configured Contract Scanner URL is reachable to prove settlement before demo claims.
+- Next recommended prompt: "Start the local Next server with the configured Contract Scanner URL, set `X402_LIVE_SMOKE=true` in `.env.local`, run `pnpm smoke:x402`, and if live settlement succeeds, update the README/demo notes to label Contract Scanner as real x402 while keeping MetaMask/ERC-7710/1Shot for the next phase."
+
+## 2026-06-01 - Phase 5 Live x402 Smoke Proof
+
+- Ran the Phase 5 live Contract Scanner x402 smoke only. No MetaMask, ERC-7710, 1Shot, Supabase, wallet UI, or real x402 for Wallet Behavior/Market Context was added.
+- Confirmed `.env.local` has `X402_LIVE_SMOKE=true`, real Contract Scanner mode, Base Sepolia network `eip155:84532`, configured facilitator, seller address, buyer key, and an absolute local scanner URL on `localhost:3000`.
+- Started a temporary local Next dev server on port 3000, ran `pnpm smoke:x402`, then stopped the remaining child process on port 3000.
+- Live smoke proof:
+  - buyer public address: `0xcC9682120BC59a4B38aFD40c6c1b37Bab551370b`
+  - Base Sepolia ETH balance: `0.0997`
+  - Base Sepolia USDC balance: `19.998` after repeated live proof runs
+  - seller address valid: `true`
+  - facilitator host: `x402.org`
+  - scanner URL host/path: `localhost:3000` / `/api/agents/contract_scanner`
+  - payment state: `real_x402_paid`
+  - response status: `200`
+  - settlement present: `true`
+  - transaction present: `true`
+- `pnpm smoke:x402` passed with one live smoke test. The script did not print private keys, signatures, payment payloads, request headers, raw facilitator responses, or full env values.
+- Verification commands passed: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:e2e`, `pnpm verify`, `pnpm build`, and standalone `pnpm smoke:x402`.
+- Commands run: sanitized `.env.local` check, `netstat -ano | findstr :3000`, temporary `pnpm dev --hostname 127.0.0.1 --port 3000`, `pnpm smoke:x402`, `Stop-Process` for the temporary server, port cleanup verification, and the full verification suite.
+- Warning: an initial combined server/smoke/cleanup wrapper had a PowerShell cleanup variable error after the smoke had passed; the smoke was rerun standalone and passed cleanly, and the temporary server was stopped.
+- Next recommended prompt: "Prepare a commit that labels Contract Scanner as live x402 while keeping MetaMask/ERC-7710/1Shot/Supabase out of scope."

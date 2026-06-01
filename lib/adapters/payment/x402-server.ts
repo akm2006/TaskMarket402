@@ -1,3 +1,6 @@
+import { HTTPFacilitatorClient, x402ResourceServer, type RouteConfig } from "@x402/core/server";
+import type { Network } from "@x402/core/types";
+import { ExactEvmScheme } from "@x402/evm/exact/server";
 import type { SpecialistAgentKind } from "../../agents/types";
 import type { AgentTask } from "../../core/types";
 
@@ -19,6 +22,9 @@ export const X402_LEGACY_PAYMENT_HEADER = "X-PAYMENT";
 const DEFAULT_DEV_PROOF = "taskmarket402-dev-payment-proof";
 const DEFAULT_SIMULATED_USDC_ASSET = "0x0000000000000000000000000000000000000402";
 const DEFAULT_SIMULATED_PAY_TO = "0x000000000000000000000000000000000000dEaD";
+export const DEFAULT_X402_FACILITATOR_URL = "https://x402.org/facilitator";
+export const DEFAULT_X402_BASE_SEPOLIA_NETWORK = "eip155:84532";
+export const DEFAULT_X402_CONTRACT_SCANNER_PRICE = "$0.001";
 
 export type X402DevPaymentFailureReason =
   | "missing_payment_proof"
@@ -79,6 +85,28 @@ export interface X402DevPaymentRejected {
 
 export type X402DevPaymentVerification = X402DevPaymentAccepted | X402DevPaymentRejected;
 
+export type X402ContractScannerMode = "simulated" | "real";
+
+export interface X402ContractScannerSellerConfig {
+  facilitatorUrl: string;
+  network: Network;
+  payTo: `0x${string}`;
+  price: string;
+}
+
+export type X402ContractScannerSellerConfigResult =
+  | {
+      ok: true;
+      mode: "real";
+      config: X402ContractScannerSellerConfig;
+    }
+  | {
+      ok: false;
+      mode: X402ContractScannerMode;
+      missing: string[];
+      invalid: string[];
+    };
+
 export interface X402PaymentResponsePayload {
   x402Version: 2;
   state: "dev_payment_accepted";
@@ -88,6 +116,151 @@ export interface X402PaymentResponsePayload {
   transaction: null;
   phase: "phase-4-dev";
   simulatedSettlement: true;
+}
+
+export function contractScannerX402Mode(env: Record<string, string | undefined> = process.env): X402ContractScannerMode {
+  return env.X402_CONTRACT_SCANNER_MODE === "real" ? "real" : "simulated";
+}
+
+function hasValue(value: string | undefined): value is string {
+  return Boolean(value?.trim());
+}
+
+function isEvmAddress(value: string): value is `0x${string}` {
+  return /^0x[a-fA-F0-9]{40}$/.test(value);
+}
+
+function normalizePrice(value: string): string {
+  const trimmed = value.trim();
+
+  if (trimmed.startsWith("$.")) {
+    return `$0${trimmed.slice(1)}`;
+  }
+
+  if (trimmed.startsWith(".")) {
+    return `$0${trimmed}`;
+  }
+
+  return trimmed;
+}
+
+function priceIsValid(value: string): boolean {
+  const trimmed = normalizePrice(value);
+  const priceBody = trimmed.charCodeAt(0) === 36 ? trimmed.slice(1) : trimmed;
+
+  return /^[0-9]+(?:\.[0-9]{1,6})?$/.test(priceBody);
+}
+
+export function resolveContractScannerSellerConfig(
+  env: Record<string, string | undefined> = process.env
+): X402ContractScannerSellerConfigResult {
+  const mode = contractScannerX402Mode(env);
+
+  if (mode !== "real") {
+    return {
+      ok: false,
+      mode,
+      missing: [],
+      invalid: []
+    };
+  }
+
+  const missing: string[] = [];
+  const invalid: string[] = [];
+  const facilitatorUrl = env.X402_FACILITATOR_URL?.trim() || DEFAULT_X402_FACILITATOR_URL;
+  const network = env.X402_SETTLEMENT_NETWORK?.trim();
+  const payTo = env.X402_PAY_TO_ADDRESS?.trim();
+  const price = normalizePrice(env.X402_CONTRACT_SCANNER_PRICE_USD || DEFAULT_X402_CONTRACT_SCANNER_PRICE);
+
+  if (!hasValue(network)) {
+    missing.push("X402_SETTLEMENT_NETWORK");
+  } else if (network !== DEFAULT_X402_BASE_SEPOLIA_NETWORK) {
+    invalid.push("X402_SETTLEMENT_NETWORK");
+  }
+
+  if (!hasValue(payTo)) {
+    missing.push("X402_PAY_TO_ADDRESS");
+  } else if (!isEvmAddress(payTo)) {
+    invalid.push("X402_PAY_TO_ADDRESS");
+  }
+
+  try {
+    new URL(facilitatorUrl);
+  } catch {
+    invalid.push("X402_FACILITATOR_URL");
+  }
+
+  if (!priceIsValid(price)) {
+    invalid.push("X402_CONTRACT_SCANNER_PRICE_USD");
+  }
+
+  if (missing.length > 0 || invalid.length > 0 || !network || !payTo || !isEvmAddress(payTo)) {
+    return {
+      ok: false,
+      mode,
+      missing,
+      invalid
+    };
+  }
+
+  return {
+    ok: true,
+    mode,
+    config: {
+      facilitatorUrl,
+      network: network as Network,
+      payTo,
+      price
+    }
+  };
+}
+
+export function createContractScannerRouteConfig(config: X402ContractScannerSellerConfig): RouteConfig {
+  return {
+    accepts: {
+      scheme: "exact",
+      price: config.price,
+      network: config.network,
+      payTo: config.payTo
+    },
+    description: "Contract Scanner Agent output for TaskMarket402 Wallet / Token Risk Report",
+    mimeType: "application/json",
+    serviceName: "TaskMarket402 Contract Scanner",
+    unpaidResponseBody: () => ({
+      contentType: "application/json",
+      body: {
+        source: "paid_agent_endpoint",
+        phase: "phase-5-real-x402",
+        payment: {
+          state: "real_x402_payment_required",
+          network: config.network,
+          settlement: "required"
+        }
+      }
+    }),
+    settlementFailedResponseBody: () => ({
+      contentType: "application/json",
+      body: {
+        source: "paid_agent_endpoint",
+        phase: "phase-5-real-x402",
+        payment: {
+          state: "real_x402_failed",
+          network: config.network,
+          settlement: "failed"
+        }
+      }
+    })
+  };
+}
+
+export function createContractScannerX402ResourceServer(
+  config: X402ContractScannerSellerConfig
+): x402ResourceServer {
+  return new x402ResourceServer(
+    new HTTPFacilitatorClient({
+      url: config.facilitatorUrl
+    })
+  ).register(config.network, new ExactEvmScheme());
 }
 
 export function createX402ProtectedResource(input: {

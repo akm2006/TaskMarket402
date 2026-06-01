@@ -39,12 +39,22 @@ const sourceStyles: Record<MissionAiRuntimeSpecialistOutputDto["source"], string
 const paymentEventStyles: Record<MissionAiPaymentEventDto["type"], string> = {
   payment_required: "border-cyan-300/50 bg-cyan-950/50 text-cyan-100",
   dev_payment_accepted: "border-emerald-300/50 bg-emerald-950/50 text-emerald-100",
+  real_x402_payment_required: "border-sky-300/50 bg-sky-950/50 text-sky-100",
+  real_x402_paid: "border-emerald-300/60 bg-emerald-950/60 text-emerald-100",
+  real_x402_failed: "border-red-300/60 bg-red-950/50 text-red-100",
+  real_x402_unavailable: "border-amber-300/60 bg-amber-950/50 text-amber-100",
+  simulated_payment_used: "border-violet-300/50 bg-violet-950/50 text-violet-100",
   agent_output_returned: "border-zinc-600 bg-zinc-900 text-zinc-200"
 };
 
 const paymentEventLabels: Record<MissionAiPaymentEventDto["type"], string> = {
   payment_required: "Payment required",
   dev_payment_accepted: "Dev payment accepted",
+  real_x402_payment_required: "Real x402 required",
+  real_x402_paid: "Real x402 paid",
+  real_x402_failed: "Real x402 failed",
+  real_x402_unavailable: "Real x402 unavailable",
+  simulated_payment_used: "Simulated fallback",
   agent_output_returned: "Agent output returned"
 };
 
@@ -157,12 +167,12 @@ export function AiRuntimePanel({ missionId }: AiRuntimePanelProps) {
             <div className="flex items-center gap-2">
               <CircleDollarSign size={17} className="text-cyan-300" />
               <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-200">
-                x402-style dev payment flow
+                Specialist paid-agent flow
               </h3>
             </div>
             <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Flow: {result.paymentFlow.replaceAll("_", " ")}. Settlement is simulated in this phase; no wallet,
-              facilitator, 1Shot relay, or onchain payment is used.
+              Flow: {result.paymentFlow.replaceAll("_", " ")}. Contract Scanner may use the real x402 path when
+              configured; Wallet Behavior and Market Context remain simulated/dev payment in this phase.
             </p>
             <div className="mt-3 grid gap-2 md:grid-cols-3">
               {result.paymentEvents.map((event) => (
@@ -179,7 +189,7 @@ export function AiRuntimePanel({ missionId }: AiRuntimePanelProps) {
                   </div>
                   <p className="mt-2 text-sm leading-5 text-zinc-300">{event.detail}</p>
                   <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-cyan-300">
-                    {event.amount} {event.currency} simulated
+                    {event.amount} {event.currency} {event.simulatedSettlement ? "simulated" : "x402"}
                   </p>
                 </div>
               ))}
