@@ -1,5 +1,15 @@
 # Build Log
 
+## 2026-06-01 - Product Completion Roadmap Context
+
+- Added `docs/PRODUCT_COMPLETION_PLAN.md` and accepted it as the current source-of-truth roadmap for TaskMarket402.
+- Updated repo context without changing app behavior: `AGENTS.md`, `README.md`, and `docs/04_BUILD_PHASES.md` now point future work to the product completion plan.
+- Surfaced the current direction: product-grade testnet app, MetaMask scoped mission permission/delegation, real x402 for all three specialist agents before final submission, 1Shot / ERC-7710 proof for at least one delegated mission-budget action, provider-switchable AI through `AI_PROVIDER=venice | gemini | mock`, and landing/README/deployment polish late in the roadmap.
+- Preserved older phase logs as historical context.
+- No app features, packages, runtime behavior, secrets, or sponsor integrations were changed.
+- Commands run: `pnpm lint`, `pnpm typecheck`, `pnpm verify`, and `graphify update .`.
+- Next recommended prompt: "Build Phase 7 only: MetaMask wallet connection and scoped mission-budget permission proof, using `docs/PRODUCT_COMPLETION_PLAN.md` as the roadmap source of truth."
+
 ## 2026-05-27 - Setup Pass
 
 - Context file found: `chatgpt-chat/chat.md`.

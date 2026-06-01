@@ -1,5 +1,23 @@
 # Build Phases
 
+## Current Roadmap Source
+
+`docs/PRODUCT_COMPLETION_PLAN.md` is the current source-of-truth roadmap. This file records the original setup-era phase structure and remains useful historical context, but new planning should follow the product completion plan.
+
+Current roadmap summary:
+
+1. MetaMask wallet + scoped mission permission proof.
+2. Real x402 for all specialist agents.
+3. 1Shot / ERC-7710 delegated Contract Scanner golden path.
+4. Connect delegated permission authority to paid-agent execution.
+5. Minimal persistence / mission audit storage.
+6. Venice live finalization and provider-switch demo polish.
+7. End-to-end mission runner.
+8. Landing / README / deployment.
+9. Final hardening.
+
+## Historical Setup-Era Plan
+
 ## Phase 0: Engineering Foundation
 
 Create Next.js foundation, docs, AGENTS.md, Codex skills, env template, and typed placeholders. No real sponsor integrations.

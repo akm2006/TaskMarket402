@@ -8,6 +8,21 @@ TaskMarket402 is a Mission Budget WorkGraph for autonomous agent teams. It turns
 
 A user creates a Wallet / Token Risk Report mission, grants one scoped MetaMask mission budget, a Manager Agent splits that budget into sub-budgets, specialist agents are paid through x402, at least one ERC-7710/x402 payment is relayed through 1Shot, Venice AI plans/verifies/synthesizes, and the WorkGraph shows every permission, payment, output, and result.
 
+## Current Product Roadmap
+
+`docs/PRODUCT_COMPLETION_PLAN.md` is the current source-of-truth roadmap for TaskMarket402. Older build-phase docs and build-log entries are historical context, not the current target.
+
+- Final target: a working product-grade testnet app, not a mock demo.
+- User connects MetaMask and grants scoped mission permission/delegation.
+- Contract Scanner, Wallet Behavior, and Market Context must all use real x402 on testnet before final submission unless a documented blocker is found.
+- Contract Scanner is already the first live-proven x402 path.
+- 1Shot / ERC-7710 must be proven for at least one delegated mission-budget action.
+- AI must remain provider-switchable through `AI_PROVIDER=venice | gemini | mock`.
+- Venice is preferred for final sponsor/demo mode; Gemini is valid for development/fallback.
+- Do not present Gemini or mock output as Venice.
+- Landing page, README polish, and deployment docs come late, after the real flow exists.
+- Never fake MetaMask approval, ERC-7710/delegation, x402 settlement, 1Shot proof, or Venice live output.
+
 ## What We Are Building
 
 - Mission creation and mission-budget policy.
@@ -65,13 +80,7 @@ Use Repomix before asking another AI tool/chat to review the whole repo, before 
 
 ## Build Order
 
-1. Setup docs, AGENTS.md, skills, env template, and typed placeholders.
-2. Build non-chain mission and WorkGraph MVP with mocks.
-3. Implement Venice planning, verification, and synthesis after docs research.
-4. Implement real-data specialist agents.
-5. Implement x402 402 challenge flow for Contract Scanner first.
-6. Implement one MetaMask + ERC-7710 + 1Shot golden path.
-7. Harden README, demo script, failure case, and reliability.
+Follow `docs/PRODUCT_COMPLETION_PLAN.md` for the current phase order. The next planned phases are MetaMask scoped permission proof, real x402 for all specialist agents, 1Shot / ERC-7710 proof for one delegated mission-budget action, delegated authority wired into paid-agent execution, minimal persistence, Venice live finalization, end-to-end runner, then landing/README/deployment hardening.
 
 ## Research-Before-Integration Rule
 
@@ -136,8 +145,8 @@ The final demo must prove:
 1. One MetaMask mission budget.
 2. One Manager Agent splitting work.
 3. One sub-budget/redelegation path.
-4. One x402 payment.
+4. Real x402 payment for Contract Scanner, Wallet Behavior, and Market Context.
 5. One 1Shot relay/status.
-6. Venice planning, verification, and synthesis.
+6. AI planning, verification, and synthesis through the selected provider, with Venice claimed only when `AI_PROVIDER=venice` and live smoke passes.
 7. WorkGraph audit trail.
 8. One blocked payment failure case.
