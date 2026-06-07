@@ -1,5 +1,29 @@
 # Build Log
 
+## 2026-06-07 - Phase 8 Real x402 For All Specialist Agents
+
+- Built Phase 8 only: upgraded Wallet Behavior and Market Context to the same real x402 buyer/seller/facilitator path already proven for Contract Scanner.
+- No 1Shot, ERC-7710 redemption, delegated MetaMask spend, Supabase, AI-provider behavior, landing-page changes, wallet UI, or user-authorized x402 execution was added.
+- Re-read official x402 buyer/seller/facilitator/network docs and rechecked installed package availability/types for `@x402/core`, `@x402/evm`, `@x402/fetch`, and `@x402/next` at `2.14.0`.
+- Updated `docs/research/x402.md` with the Phase 8 multi-agent x402 shape, env vars, route requirements, smoke expectations, and live proof result.
+- Generalized `lib/adapters/payment/x402-server.ts` and `lib/adapters/payment/x402-client.ts` from Contract Scanner-only helpers to per-specialist x402 helpers while keeping Contract Scanner compatibility wrappers.
+- Checkpoint fix: adjusted the real x402 client response inspection to decode the settlement header directly and parse cloned JSON defensively after `wrapFetchWithPayment`, avoiding a repeated body/settlement parse failure while keeping sanitized failure states.
+- Updated `POST /api/agents/[agentKind]` so any configured specialist can use real x402 route protection; non-real/unconfigured agents still use the existing simulated/dev fallback path.
+- Updated the paid-agent runtime so each specialist records its own `real_x402_payment_required`, `real_x402_paid`, `real_x402_failed`, `real_x402_unavailable`, or fallback/dev event.
+- Updated mission UI and WorkGraph copy so all three specialist agents can be shown as real x402-paid when runtime events prove settlement, while still saying this is not user-delegated spend yet.
+- Updated `.env.example` with safe Phase 8 variable names for Wallet Behavior and Market Context mode, URL, and price. No secrets were added.
+- Extended unit/API/runtime/e2e coverage for all-agent real x402 states, per-agent dev fallback behavior, missing real config, and client-safe UI labels.
+- Extended `pnpm smoke:x402` so it validates all three specialist routes and prints only sanitized readiness/payment fields.
+- Live x402 smoke result with `X402_LIVE_SMOKE=true` and a temporary network-enabled local Next server:
+  - Contract Scanner: `real_x402_paid`, response status `200`, settlement present, transaction present.
+  - Wallet Behavior: `real_x402_paid`, response status `200`, settlement present, transaction present.
+  - Market Context: `real_x402_paid`, response status `200`, settlement present, transaction present.
+- Smoke safety: no private key, payment signature, payment payload, request headers, raw facilitator response, or full env values were printed.
+- Commands run: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:e2e`, `pnpm verify`, `pnpm build`, `pnpm smoke:gemini`, `pnpm smoke:venice`, `pnpm smoke:x402`, temporary local `pnpm dev --hostname 127.0.0.1 --port 3000`, sanitized route probes, and port cleanup checks.
+- Warnings: initial x402 smoke attempts failed while a non-escalated temporary dev server could not reach the facilitator (`EACCES`); checkpoint reruns also exposed a Wallet Behavior `request` / `SyntaxError` from repeated x402 response processing. After the response-inspection fix, all three live x402 payments passed. Playwright still reports the existing React Flow dev-server `nodeTypes/edgeTypes` warning while tests pass. The dev-server command used for live smoke times out intentionally after the smoke, and the leftover listener was stopped.
+- Remaining limitation: Phase 8 proves server-side buyer x402 payments for all specialist agents. It does not prove user-delegated x402 execution, ERC-7710 redemption, 1Shot relay/status, Supabase persistence, or Venice live inference.
+- Next recommended prompt: "Build Phase 9 only: implement the 1Shot / ERC-7710 delegated Contract Scanner golden path, keeping all three x402-paid agents stable and preserving the server-side buyer path as a fallback until delegated spend is proven."
+
 ## 2026-06-07 - Phase 7 Live MetaMask Permission Proof Passed
 
 - Completed the manual/live Phase 7 MetaMask permission proof in the browser after the Base Sepolia switch/recheck patch.

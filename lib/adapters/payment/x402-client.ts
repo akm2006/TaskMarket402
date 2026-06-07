@@ -4,13 +4,15 @@ import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { privateKeyToAccount } from "viem/accounts";
 import type { SpecialistAgentRun } from "../../agents";
+import type { SpecialistAgentKind } from "../../agents/types";
 import type { AgentTask } from "../../core/types";
 import {
-  contractScannerX402Mode,
   createDevPaymentSignature,
+  DEFAULT_X402_AGENT_PRICE,
   DEFAULT_X402_BASE_SEPOLIA_NETWORK,
-  DEFAULT_X402_CONTRACT_SCANNER_PRICE,
   X402_PAYMENT_SIGNATURE_HEADER,
+  x402AgentEnvKeys,
+  x402AgentMode,
   type X402ProtectedResource
 } from "./x402-server";
 
@@ -45,7 +47,8 @@ export type RealX402FailureCategory =
   | "invalid_response"
   | "unknown";
 
-export interface X402ContractScannerBuyerConfig {
+export interface X402AgentBuyerConfig {
+  agentKind: SpecialistAgentKind;
   privateKey: `0x${string}`;
   url: string;
   network: Network;
@@ -53,11 +56,11 @@ export interface X402ContractScannerBuyerConfig {
   rpcUrl?: string;
 }
 
-export type X402ContractScannerBuyerConfigResult =
+export type X402AgentBuyerConfigResult =
   | {
       ok: true;
       mode: "real";
-      config: X402ContractScannerBuyerConfig;
+      config: X402AgentBuyerConfig;
       buyerAddress: `0x${string}`;
     }
   | {
@@ -67,7 +70,8 @@ export type X402ContractScannerBuyerConfigResult =
       invalid: string[];
     };
 
-export interface X402ContractScannerPaymentResult {
+export interface X402AgentPaymentResult {
+  agentKind: SpecialistAgentKind;
   state: RealX402PaymentState;
   responseStatus?: number;
   failureCategory?: RealX402FailureCategory;
@@ -79,12 +83,18 @@ export interface X402ContractScannerPaymentResult {
   specialistRun?: SpecialistAgentRun;
 }
 
-export interface PayContractScannerWithX402Options {
+export interface PaySpecialistAgentWithX402Options {
   env?: Record<string, string | undefined>;
   fetchFn?: typeof globalThis.fetch;
   fetchWithPayment?: typeof globalThis.fetch;
   settlementInspector?: (response: Response) => Promise<x402PaymentResult>;
+  requestTimeoutMs?: number;
 }
+
+export type X402ContractScannerBuyerConfig = X402AgentBuyerConfig;
+export type X402ContractScannerBuyerConfigResult = X402AgentBuyerConfigResult;
+export type X402ContractScannerPaymentResult = X402AgentPaymentResult;
+export type PayContractScannerWithX402Options = PaySpecialistAgentWithX402Options;
 
 export function prepareDevX402PaymentProof(
   resource: X402ProtectedResource,
@@ -155,14 +165,14 @@ function isSpecialistAgentRun(value: unknown): value is SpecialistAgentRun {
   );
 }
 
-function bodySpecialistRun(body: unknown): SpecialistAgentRun | undefined {
+function bodySpecialistRun(body: unknown, agentKind: SpecialistAgentKind): SpecialistAgentRun | undefined {
   if (typeof body !== "object" || body === null || !("specialistRun" in body)) {
     return undefined;
   }
 
   const candidate = (body as { specialistRun?: unknown }).specialistRun;
 
-  return isSpecialistAgentRun(candidate) ? candidate : undefined;
+  return isSpecialistAgentRun(candidate) && candidate.agentKind === agentKind ? candidate : undefined;
 }
 
 function settleInfo(settleResponse: SettleResponse | undefined): {
@@ -179,7 +189,89 @@ function settleInfo(settleResponse: SettleResponse | undefined): {
   };
 }
 
-function createConfiguredX402Client(config: X402ContractScannerBuyerConfig): x402Client {
+async function safeResponseBody(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  try {
+    if (contentType.includes("application/json")) {
+      return await response.clone().json();
+    }
+
+    return await response.clone().text();
+  } catch {
+    return undefined;
+  }
+}
+
+async function inspectPaidResponse(
+  httpClient: x402HTTPClient,
+  response: Response
+): Promise<x402PaymentResult> {
+  const getHeader = (name: string) => response.headers.get(name);
+  let settleResponse: SettleResponse | undefined;
+
+  try {
+    settleResponse = httpClient.getPaymentSettleResponse(getHeader);
+  } catch {
+    settleResponse = undefined;
+  }
+
+  const body = await safeResponseBody(response);
+
+  if (settleResponse?.success) {
+    return {
+      kind: "success",
+      response,
+      body,
+      settleResponse
+    };
+  }
+
+  if (settleResponse && !settleResponse.success) {
+    return {
+      kind: "settle_failed",
+      response,
+      body,
+      settleResponse
+    };
+  }
+
+  if (response.status === 402) {
+    try {
+      const paymentRequired = httpClient.getPaymentRequiredResponse(getHeader, body);
+
+      return {
+        kind: "payment_required",
+        response,
+        paymentRequired
+      };
+    } catch {
+      return {
+        kind: "error",
+        response,
+        status: response.status,
+        body
+      };
+    }
+  }
+
+  if (response.ok) {
+    return {
+      kind: "passthrough",
+      response,
+      body
+    };
+  }
+
+  return {
+    kind: "error",
+    response,
+    status: response.status,
+    body
+  };
+}
+
+function createConfiguredX402Client(config: X402AgentBuyerConfig): x402Client {
   const signer = privateKeyToAccount(config.privateKey);
   const client = new x402Client();
 
@@ -202,10 +294,27 @@ function createConfiguredX402Client(config: X402ContractScannerBuyerConfig): x40
   return client;
 }
 
-export function resolveContractScannerBuyerConfig(
+function fetchWithTimeout(fetchFn: typeof globalThis.fetch, timeoutMs: number): typeof globalThis.fetch {
+  return async (input, init) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetchFn(input, {
+        ...init,
+        signal: init?.signal ?? controller.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
+export function resolveAgentBuyerConfig(
+  agentKind: SpecialistAgentKind,
   env: Record<string, string | undefined> = process.env
-): X402ContractScannerBuyerConfigResult {
-  const mode = contractScannerX402Mode(env);
+): X402AgentBuyerConfigResult {
+  const mode = x402AgentMode(agentKind, env);
 
   if (mode !== "real") {
     return {
@@ -218,10 +327,11 @@ export function resolveContractScannerBuyerConfig(
 
   const missing: string[] = [];
   const invalid: string[] = [];
+  const envKeys = x402AgentEnvKeys(agentKind);
   const privateKey = normalizePrivateKey(env.X402_BUYER_PRIVATE_KEY);
-  const url = env.X402_CONTRACT_SCANNER_URL?.trim();
+  const url = env[envKeys.urlKey]?.trim();
   const network = env.X402_SETTLEMENT_NETWORK?.trim();
-  const price = normalizePrice(env.X402_CONTRACT_SCANNER_PRICE_USD || DEFAULT_X402_CONTRACT_SCANNER_PRICE);
+  const price = normalizePrice(env[envKeys.priceKey] || DEFAULT_X402_AGENT_PRICE);
 
   if (!hasValue(env.X402_BUYER_PRIVATE_KEY)) {
     missing.push("X402_BUYER_PRIVATE_KEY");
@@ -230,12 +340,12 @@ export function resolveContractScannerBuyerConfig(
   }
 
   if (!hasValue(url)) {
-    missing.push("X402_CONTRACT_SCANNER_URL");
+    missing.push(envKeys.urlKey);
   } else {
     try {
       new URL(url);
     } catch {
-      invalid.push("X402_CONTRACT_SCANNER_URL");
+      invalid.push(envKeys.urlKey);
     }
   }
 
@@ -246,7 +356,7 @@ export function resolveContractScannerBuyerConfig(
   }
 
   if (!priceIsValid(price)) {
-    invalid.push("X402_CONTRACT_SCANNER_PRICE_USD");
+    invalid.push(envKeys.priceKey);
   }
 
   if (missing.length > 0 || invalid.length > 0 || !privateKey || !url || !network) {
@@ -262,6 +372,7 @@ export function resolveContractScannerBuyerConfig(
     ok: true,
     mode,
     config: {
+      agentKind,
       privateKey,
       url,
       network: network as Network,
@@ -272,17 +383,25 @@ export function resolveContractScannerBuyerConfig(
   };
 }
 
-export async function payContractScannerWithX402(
+export function resolveContractScannerBuyerConfig(
+  env: Record<string, string | undefined> = process.env
+): X402ContractScannerBuyerConfigResult {
+  return resolveAgentBuyerConfig("contract_scanner", env);
+}
+
+export async function paySpecialistAgentWithX402(
+  agentKind: SpecialistAgentKind,
   payload: {
     targetAddress: string;
   },
-  options: PayContractScannerWithX402Options = {}
-): Promise<X402ContractScannerPaymentResult> {
+  options: PaySpecialistAgentWithX402Options = {}
+): Promise<X402AgentPaymentResult> {
   const env = options.env ?? process.env;
-  const configResult = resolveContractScannerBuyerConfig(env);
+  const configResult = resolveAgentBuyerConfig(agentKind, env);
 
   if (!configResult.ok) {
     return {
+      agentKind,
       state: "real_x402_unavailable",
       failureCategory: "configuration",
       settlementPresent: false,
@@ -292,9 +411,13 @@ export async function payContractScannerWithX402(
 
   try {
     const client = createConfiguredX402Client(configResult.config);
+    const baseFetch =
+      options.requestTimeoutMs && options.requestTimeoutMs > 0
+        ? fetchWithTimeout(options.fetchFn ?? globalThis.fetch, options.requestTimeoutMs)
+        : (options.fetchFn ?? globalThis.fetch);
     const paidFetch =
       options.fetchWithPayment ??
-      wrapFetchWithPayment(options.fetchFn ?? globalThis.fetch, client);
+      wrapFetchWithPayment(baseFetch, client);
     const response = await paidFetch(configResult.config.url, {
       method: "POST",
       headers: {
@@ -306,15 +429,17 @@ export async function payContractScannerWithX402(
       })
     });
     const responseStatus = response.status;
+    const httpClient = new x402HTTPClient(client);
     const inspected = options.settlementInspector
       ? await options.settlementInspector(response)
-      : await new x402HTTPClient(client).processResponse(response);
+      : await inspectPaidResponse(httpClient, response);
 
     if (inspected.kind === "success") {
-      const specialistRun = bodySpecialistRun(inspected.body);
+      const specialistRun = bodySpecialistRun(inspected.body, agentKind);
 
       if (!specialistRun) {
         return {
+          agentKind,
           state: "real_x402_failed",
           responseStatus,
           failureCategory: "invalid_response",
@@ -323,6 +448,7 @@ export async function payContractScannerWithX402(
       }
 
       return {
+        agentKind,
         state: "real_x402_paid",
         responseStatus,
         specialistRun,
@@ -332,6 +458,7 @@ export async function payContractScannerWithX402(
 
     if (inspected.kind === "settle_failed") {
       return {
+        agentKind,
         state: "real_x402_failed",
         responseStatus,
         failureCategory: "settlement",
@@ -341,6 +468,7 @@ export async function payContractScannerWithX402(
 
     if (inspected.kind === "payment_required") {
       return {
+        agentKind,
         state: "real_x402_failed",
         responseStatus,
         failureCategory: "payment_required",
@@ -351,6 +479,7 @@ export async function payContractScannerWithX402(
 
     if (inspected.kind === "error") {
       return {
+        agentKind,
         state: "real_x402_failed",
         responseStatus,
         failureCategory: "request",
@@ -360,6 +489,7 @@ export async function payContractScannerWithX402(
     }
 
     return {
+      agentKind,
       state: "real_x402_failed",
       responseStatus,
       failureCategory: "invalid_response",
@@ -368,6 +498,7 @@ export async function payContractScannerWithX402(
     };
   } catch (error) {
     return {
+      agentKind,
       state: "real_x402_failed",
       failureCategory: "request",
       errorClass: error instanceof Error ? error.name : "UnknownError",
@@ -375,6 +506,15 @@ export async function payContractScannerWithX402(
       transactionPresent: false
     };
   }
+}
+
+export async function payContractScannerWithX402(
+  payload: {
+    targetAddress: string;
+  },
+  options: PayContractScannerWithX402Options = {}
+): Promise<X402ContractScannerPaymentResult> {
+  return paySpecialistAgentWithX402("contract_scanner", payload, options);
 }
 
 export async function payX402Challenge(

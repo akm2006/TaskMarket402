@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   payContractScannerWithX402,
+  paySpecialistAgentWithX402,
+  resolveAgentBuyerConfig,
   resolveContractScannerBuyerConfig
 } from "../lib/adapters/payment/x402-client";
 import type { SpecialistAgentRun } from "../lib/agents";
+import type { SpecialistAgentKind } from "../lib/agents/types";
 import { phaseOneDemoSnapshot } from "../lib/core/phase-one-demo";
 import { runPaidSpecialistAgentsWithDevPayment } from "../lib/runtime/paid-agent-flow";
 
@@ -15,19 +18,49 @@ const validEnv = {
   X402_FACILITATOR_URL: "https://x402.org/facilitator",
   X402_CONTRACT_SCANNER_URL: "http://localhost:3000/api/agents/contract-scanner",
   X402_CONTRACT_SCANNER_PRICE_USD: "$0.001",
+  X402_WALLET_BEHAVIOR_MODE: "real",
+  X402_WALLET_BEHAVIOR_URL: "http://localhost:3000/api/agents/wallet-behavior",
+  X402_WALLET_BEHAVIOR_PRICE_USD: "$0.001",
+  X402_MARKET_CONTEXT_MODE: "real",
+  X402_MARKET_CONTEXT_URL: "http://localhost:3000/api/agents/market-context",
+  X402_MARKET_CONTEXT_PRICE_USD: "$0.001",
   X402_DEV_MODE: "true",
   X402_DEV_PAYMENT_PROOF: "unit-test-proof"
 };
 
-const contractScannerRun: SpecialistAgentRun = {
-  agentKind: "contract_scanner",
-  source: "fallback",
-  diagnostics: ["Mocked real x402 specialist output."],
-  output: {
-    taskId: "risk-report-demo:contract-scanner",
-    summary: "Mocked Contract Scanner output after x402 settlement.",
-    evidence: ["Output source: fallback", "Mocked x402 settlement accepted."],
-    riskSignals: ["mocked-real-x402"]
+const specialistRuns: Record<SpecialistAgentKind, SpecialistAgentRun> = {
+  contract_scanner: {
+    agentKind: "contract_scanner",
+    source: "fallback",
+    diagnostics: ["Mocked real x402 specialist output."],
+    output: {
+      taskId: "risk-report-demo:contract-scanner",
+      summary: "Mocked Contract Scanner output after x402 settlement.",
+      evidence: ["Output source: fallback", "Mocked x402 settlement accepted."],
+      riskSignals: ["mocked-real-x402"]
+    }
+  },
+  wallet_behavior: {
+    agentKind: "wallet_behavior",
+    source: "fallback",
+    diagnostics: ["Mocked real x402 wallet output."],
+    output: {
+      taskId: "risk-report-demo:wallet-behavior",
+      summary: "Mocked Wallet Behavior output after x402 settlement.",
+      evidence: ["Output source: fallback", "Mocked x402 settlement accepted."],
+      riskSignals: ["mocked-real-x402"]
+    }
+  },
+  market_context: {
+    agentKind: "market_context",
+    source: "fallback",
+    diagnostics: ["Mocked real x402 market output."],
+    output: {
+      taskId: "risk-report-demo:market-context",
+      summary: "Mocked Market Context output after x402 settlement.",
+      evidence: ["Output source: fallback", "Mocked x402 settlement accepted."],
+      riskSignals: ["mocked-real-x402"]
+    }
   }
 };
 
@@ -53,6 +86,16 @@ describe("real x402 Contract Scanner adapter boundary", () => {
     expect(result.ok && result.buyerAddress).toMatch(/^0x[a-fA-F0-9]{40}$/);
   });
 
+  it("validates real-mode buyer config for each specialist agent", () => {
+    for (const agentKind of ["contract_scanner", "wallet_behavior", "market_context"] as SpecialistAgentKind[]) {
+      const result = resolveAgentBuyerConfig(agentKind, validEnv);
+
+      expect(result.ok).toBe(true);
+      expect(result.ok && result.config.agentKind).toBe(agentKind);
+      expect(result.ok && result.buyerAddress).toMatch(/^0x[a-fA-F0-9]{40}$/);
+    }
+  });
+
   it("falls back safely when the buyer key is missing", () => {
     const result = resolveContractScannerBuyerConfig({
       ...validEnv,
@@ -66,6 +109,19 @@ describe("real x402 Contract Scanner adapter boundary", () => {
     });
   });
 
+  it("falls back safely when a real agent route URL is missing", () => {
+    const result = resolveAgentBuyerConfig("wallet_behavior", {
+      ...validEnv,
+      X402_WALLET_BEHAVIOR_URL: ""
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      mode: "real",
+      missing: ["X402_WALLET_BEHAVIOR_URL"]
+    });
+  });
+
   it("parses a valid settled Contract Scanner response into the internal schema", async () => {
     const result = await payContractScannerWithX402(
       {
@@ -73,8 +129,9 @@ describe("real x402 Contract Scanner adapter boundary", () => {
       },
       {
         env: validEnv,
-        fetchWithPayment: async () => new Response(JSON.stringify({ specialistRun: contractScannerRun }), { status: 200 }),
-        settlementInspector: async () => settledResult({ specialistRun: contractScannerRun })
+        fetchWithPayment: async () =>
+          new Response(JSON.stringify({ specialistRun: specialistRuns.contract_scanner }), { status: 200 }),
+        settlementInspector: async () => settledResult({ specialistRun: specialistRuns.contract_scanner })
       }
     );
 
@@ -87,6 +144,34 @@ describe("real x402 Contract Scanner adapter boundary", () => {
         agentKind: "contract_scanner"
       }
     });
+  });
+
+  it("parses valid settled Wallet Behavior and Market Context responses into the same schema", async () => {
+    for (const agentKind of ["wallet_behavior", "market_context"] as SpecialistAgentKind[]) {
+      const result = await paySpecialistAgentWithX402(
+        agentKind,
+        {
+          targetAddress: phaseOneDemoSnapshot.mission.targetAddress
+        },
+        {
+          env: validEnv,
+          fetchWithPayment: async () =>
+            new Response(JSON.stringify({ specialistRun: specialistRuns[agentKind] }), { status: 200 }),
+          settlementInspector: async () => settledResult({ specialistRun: specialistRuns[agentKind] })
+        }
+      );
+
+      expect(result).toMatchObject({
+        agentKind,
+        state: "real_x402_paid",
+        responseStatus: 200,
+        settlementPresent: true,
+        transactionPresent: true,
+        specialistRun: {
+          agentKind
+        }
+      });
+    }
   });
 
   it("returns a sanitized malformed-response fallback", async () => {
@@ -166,32 +251,34 @@ describe("real x402 Contract Scanner adapter boundary", () => {
   });
 });
 
-describe("paid-agent runtime with one real x402 Contract Scanner path", () => {
-  it("uses real x402 for Contract Scanner and keeps the other agents simulated", async () => {
+describe("paid-agent runtime with multi-agent real x402 paths", () => {
+  it("uses real x402 for all configured specialist agents", async () => {
     const result = await runPaidSpecialistAgentsWithDevPayment(phaseOneDemoSnapshot, {
       env: validEnv,
       now: () => "2026-06-01T00:00:00.000Z",
-      contractScannerBuyer: async () => ({
+      x402Buyer: async (agentKind) => ({
+        agentKind,
         state: "real_x402_paid",
         responseStatus: 200,
         settlementPresent: true,
         transactionPresent: true,
-        specialistRun: contractScannerRun
+        specialistRun: specialistRuns[agentKind]
       })
     });
 
-    expect(result.flow).toBe("x402_contract_scanner_real");
+    expect(result.flow).toBe("x402_real_agents");
     expect(result.runs).toHaveLength(3);
-    expect(result.paymentEvents.map((event) => event.type)).toContain("real_x402_paid");
-    expect(result.paymentEvents.filter((event) => event.type === "dev_payment_accepted")).toHaveLength(2);
-    expect(result.paymentEvents.find((event) => event.type === "real_x402_paid")?.simulatedSettlement).toBe(false);
+    expect(result.paymentEvents.filter((event) => event.type === "real_x402_paid")).toHaveLength(3);
+    expect(result.paymentEvents.filter((event) => event.type === "dev_payment_accepted")).toHaveLength(0);
+    expect(result.paymentEvents.filter((event) => event.type === "real_x402_paid").every((event) => !event.simulatedSettlement)).toBe(true);
   });
 
-  it("falls back visibly to the simulated Contract Scanner path when real x402 is unavailable", async () => {
+  it("falls back visibly to the simulated path when a real x402 agent is unavailable", async () => {
     const result = await runPaidSpecialistAgentsWithDevPayment(phaseOneDemoSnapshot, {
       env: validEnv,
       now: () => "2026-06-01T00:00:00.000Z",
-      contractScannerBuyer: async () => ({
+      x402Buyer: async (agentKind) => ({
+        agentKind,
         state: "real_x402_unavailable",
         failureCategory: "configuration",
         settlementPresent: false,
@@ -199,10 +286,10 @@ describe("paid-agent runtime with one real x402 Contract Scanner path", () => {
       })
     });
 
-    expect(result.flow).toBe("x402_contract_scanner_real");
+    expect(result.flow).toBe("x402_real_agents");
     expect(result.runs).toHaveLength(3);
-    expect(result.paymentEvents.map((event) => event.type)).toContain("real_x402_unavailable");
-    expect(result.paymentEvents.map((event) => event.type)).toContain("simulated_payment_used");
-    expect(result.paymentEvents.find((event) => event.type === "simulated_payment_used")?.simulatedSettlement).toBe(true);
+    expect(result.paymentEvents.filter((event) => event.type === "real_x402_unavailable")).toHaveLength(3);
+    expect(result.paymentEvents.filter((event) => event.type === "simulated_payment_used")).toHaveLength(3);
+    expect(result.paymentEvents.filter((event) => event.type === "simulated_payment_used").every((event) => event.simulatedSettlement)).toBe(true);
   });
 });

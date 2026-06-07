@@ -313,4 +313,39 @@ describe("mission AI runtime", () => {
     expect(result.paymentEvents.every((event) => event.simulatedSettlement)).toBe(true);
     expect(result.state).toBe("completed");
   });
+
+  it("returns all-agent real x402 payment events from the paid-agent runtime path", async () => {
+    const paymentEvents: PaidAgentFlowResult["paymentEvents"] = staticRuns.map((run) => ({
+      id: `event-real-x402-paid-${run.agentKind}`,
+      type: "real_x402_paid",
+      agentKind: run.agentKind,
+      taskId: run.output.taskId,
+      resourceId: `risk-report-demo:${run.agentKind}:${run.output.taskId}`,
+      title: "Real x402 paid",
+      detail: `${run.agentKind} settled through real x402.`,
+      amount: "0.001",
+      currency: "USDC",
+      occurredAt: now(),
+      simulatedSettlement: false
+    }));
+    const paidAgentRunner = async (): Promise<PaidAgentFlowResult> => ({
+      flow: "x402_real_agents",
+      runs: staticRuns,
+      paymentEvents
+    });
+
+    const result = await runDemoMissionAiRuntime({
+      provider: successfulProvider(),
+      snapshot: phaseOneDemoSnapshot,
+      paymentFlow: "x402_real_agents",
+      paidAgentRunner,
+      now
+    });
+
+    expect(result.paymentFlow).toBe("x402_real_agents");
+    expect(result.paymentEvents).toHaveLength(3);
+    expect(result.paymentEvents.every((event) => event.type === "real_x402_paid")).toBe(true);
+    expect(result.paymentEvents.every((event) => !event.simulatedSettlement)).toBe(true);
+    expect(result.state).toBe("completed");
+  });
 });

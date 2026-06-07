@@ -82,21 +82,21 @@ const workGraph: WorkGraph = {
       subBudget: "0.35 USDC",
       output: "Wallet behavior analysis",
       source: "Server-side specialist agent",
-      paymentMode: "simulated payment",
+      paymentMode: "real x402 capable",
       outputMode: "real-data or fallback output"
     }),
     node("market-context", "Market Context Agent", "agent", "completed", {
       subBudget: "0.25 USDC",
       output: "Market context analysis",
       source: "Server-side specialist agent",
-      paymentMode: "simulated payment",
+      paymentMode: "real x402 capable",
       outputMode: "real-data or fallback output"
     }),
     node("x402-payment", "x402 Payment Node", "payment", "payment_required", {
-      amount: "0.40 USDC",
-      resource: "Contract Scanner report",
-      status: "Contract Scanner real x402",
-      implementation: "Phase 5 Base Sepolia path is live-proven when runtime/env are configured",
+      amount: "0.001 USDC per configured agent route",
+      resource: "Contract Scanner, Wallet Behavior, and Market Context reports",
+      status: "Per-agent real x402 on Base Sepolia when configured",
+      implementation: "Phase 8 reuses the live-proven Contract Scanner x402 boundary for all specialist agents",
       paymentMode: "real x402"
     }),
     node("oneshot-relay", "1Shot Relay Status", "relay", "planned", {
@@ -192,7 +192,7 @@ const events: WorkGraphEvent[] = [
     occurredAt: "09:30:08",
     actor: "Contract Scanner",
     title: "x402 payment boundary",
-    detail: "Contract Scanner owns the real x402 path in Phase 5; Wallet Behavior and Market Context remain simulated/dev payment.",
+    detail: "Phase 8 upgrades Contract Scanner, Wallet Behavior, and Market Context to per-agent real x402 when configured; user-delegated spend remains a later phase.",
     status: "payment_required",
     relatedNodeId: "x402-payment"
   },
@@ -227,11 +227,11 @@ const finalReport: FinalReportPlaceholder = {
     },
     {
       heading: "Specialist Outputs",
-      body: "Contract Scanner can run behind the real x402 path; Wallet Behavior and Market Context intentionally stay on simulated/dev payment for this phase."
+      body: "Contract Scanner, Wallet Behavior, and Market Context can run behind real x402 route protection when local/deployed env config is available."
     },
     {
       heading: "Deferred Integrations",
-      body: "MetaMask, ERC-7710, 1Shot relay, wallet UI, and Supabase persistence remain out of scope for Phase 6."
+      body: "ERC-7710 redemption, 1Shot relay, user-delegated x402 execution, and Supabase persistence remain out of scope for Phase 8."
     }
   ]
 };

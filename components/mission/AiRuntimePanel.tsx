@@ -160,7 +160,7 @@ function paymentBadgeForAgent(events: MissionAiPaymentEventDto[], agentKind: Spe
     return {
       label: "Real x402 paid agent",
       tone: "real" as const,
-      detail: "Settlement completed before Contract Scanner output was returned."
+      detail: `Settlement completed before ${agentLabel(agentKind)} output was returned.`
     };
   }
 
@@ -193,7 +193,10 @@ function aiBadge(status: MissionAiRuntimeStatus) {
 
 function timelineSteps(result: MissionAiRuntimeResponse) {
   const eventTypes = new Set(result.paymentEvents.map((event) => event.type));
-  const realPaid = eventTypes.has("real_x402_paid");
+  const realPaidCount = result.paymentEvents.filter(
+    (event) => event.type === "real_x402_paid" && !event.simulatedSettlement
+  ).length;
+  const realPaid = realPaidCount > 0;
   const simulatedPaid = eventTypes.has("simulated_payment_used") || eventTypes.has("dev_payment_accepted");
   const verificationBadge = aiBadge(result.verification.status);
   const reportBadge = aiBadge(result.finalReport.status);
@@ -203,7 +206,7 @@ function timelineSteps(result: MissionAiRuntimeResponse) {
       id: "payment_required",
       label: "payment_required",
       detail: eventTypes.has("real_x402_payment_required")
-        ? "Contract Scanner real x402 challenge recorded."
+        ? "Real x402 challenge recorded for configured specialist agents."
         : "Paid-agent challenge recorded.",
       done: eventTypes.has("payment_required") || eventTypes.has("real_x402_payment_required"),
       tone: "neutral" as const
@@ -212,7 +215,7 @@ function timelineSteps(result: MissionAiRuntimeResponse) {
       id: realPaid ? "real_x402_paid" : "simulated_payment_used",
       label: realPaid ? "real_x402_paid" : "simulated_payment_used",
       detail: realPaid
-        ? "Contract Scanner settled through real x402."
+        ? `${realPaidCount} specialist agent${realPaidCount === 1 ? "" : "s"} settled through real x402.`
         : "Specialist agents used simulated/dev payment.",
       done: realPaid || simulatedPaid,
       tone: realPaid ? ("real" as const) : ("simulated" as const)
@@ -342,13 +345,13 @@ export function AiRuntimePanel({ missionId }: AiRuntimePanelProps) {
             <div className="flex items-center gap-2">
               <CircleDollarSign size={17} className="text-cyan-300" />
               <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-200">
-                Hybrid specialist paid-agent flow
+                Specialist x402 paid-agent flow
               </h3>
             </div>
             <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Flow: {result.paymentFlow.replaceAll("_", " ")}. Contract Scanner is the only Phase 5 real x402 agent
-              when the runtime returns a real payment event. Wallet Behavior and Market Context remain simulated/dev
-              payment by design.
+              Flow: {result.paymentFlow.replaceAll("_", " ")}. Each specialist agent reports its own payment state.
+              Real x402 badges mean Base Sepolia settlement completed for that agent; fallback/dev badges mean no real
+              settlement is claimed. This is not user-delegated spend yet.
             </p>
 
             <div className="mt-4 grid gap-3 md:grid-cols-3">

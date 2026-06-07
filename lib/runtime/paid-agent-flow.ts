@@ -1,12 +1,17 @@
 import {
   payContractScannerWithX402,
+  paySpecialistAgentWithX402,
+  type PaySpecialistAgentWithX402Options,
+  type X402AgentPaymentResult,
   type X402ContractScannerPaymentResult
 } from "../adapters/payment/x402-client";
 import {
-  contractScannerX402Mode,
   createDevPaymentSignature,
   createX402ProtectedResource,
   verifyDevPaymentProof,
+  x402AgentEnvKeys,
+  x402AgentLabel,
+  x402AgentMode,
   type X402ProtectedResource
 } from "../adapters/payment/x402-server";
 import { runSpecialistAgentByKind, type SpecialistAgentOptions, type SpecialistAgentRun } from "../agents";
@@ -23,7 +28,7 @@ export type PaidAgentPaymentEventType =
   | "real_x402_unavailable"
   | "simulated_payment_used"
   | "agent_output_returned";
-export type PaidAgentFlow = "direct_agents" | "x402_style_dev" | "x402_contract_scanner_real";
+export type PaidAgentFlow = "direct_agents" | "x402_style_dev" | "x402_contract_scanner_real" | "x402_real_agents";
 
 export interface PaidAgentPaymentEvent {
   id: string;
@@ -40,13 +45,18 @@ export interface PaidAgentPaymentEvent {
 }
 
 export interface PaidAgentFlowResult {
-  flow: "x402_style_dev" | "x402_contract_scanner_real";
+  flow: "x402_style_dev" | "x402_contract_scanner_real" | "x402_real_agents";
   runs: SpecialistAgentRun[];
   paymentEvents: PaidAgentPaymentEvent[];
 }
 
 export interface PaidAgentFlowOptions extends SpecialistAgentOptions {
   now?: () => string;
+  x402Buyer?: (
+    agentKind: SpecialistAgentKind,
+    payload: { targetAddress: string },
+    options?: PaySpecialistAgentWithX402Options
+  ) => Promise<X402AgentPaymentResult>;
   contractScannerBuyer?: (
     payload: { targetAddress: string },
     options?: Parameters<typeof payContractScannerWithX402>[1]
@@ -140,6 +150,32 @@ function resourceWithPrice(resource: X402ProtectedResource, price: string): X402
   };
 }
 
+function realResourceUrl(agentKind: SpecialistAgentKind, env: Record<string, string | undefined> | undefined): string | undefined {
+  return env?.[x402AgentEnvKeys(agentKind).urlKey]?.trim() || undefined;
+}
+
+function realResourcePrice(agentKind: SpecialistAgentKind, env: Record<string, string | undefined> | undefined): string | undefined {
+  return env?.[x402AgentEnvKeys(agentKind).priceKey]?.trim() || undefined;
+}
+
+function realPaymentBuyer(options: PaidAgentFlowOptions) {
+  return async (
+    agentKind: SpecialistAgentKind,
+    payload: { targetAddress: string },
+    buyerOptions?: PaySpecialistAgentWithX402Options
+  ): Promise<X402AgentPaymentResult> => {
+    if (options.x402Buyer) {
+      return options.x402Buyer(agentKind, payload, buyerOptions);
+    }
+
+    if (agentKind === "contract_scanner" && options.contractScannerBuyer) {
+      return options.contractScannerBuyer(payload, buyerOptions);
+    }
+
+    return paySpecialistAgentWithX402(agentKind, payload, buyerOptions);
+  };
+}
+
 function paymentFallbackRun(
   mission: Mission,
   agentKind: SpecialistAgentKind,
@@ -178,34 +214,31 @@ export async function runPaidSpecialistAgentsWithDevPayment(
   const runs: SpecialistAgentRun[] = [];
   const paymentEvents: PaidAgentPaymentEvent[] = [];
   let flow: PaidAgentFlowResult["flow"] = "x402_style_dev";
+  const buyer = realPaymentBuyer(options);
 
   for (const agentKind of specialistKinds) {
+    const agentLabel = x402AgentLabel(agentKind);
     const baseResourceUrl =
-      agentKind === "contract_scanner" && options.env?.X402_CONTRACT_SCANNER_URL
-        ? options.env.X402_CONTRACT_SCANNER_URL
-        : `internal://taskmarket402/api/agents/${specialistAgentSlug(agentKind)}`;
+      realResourceUrl(agentKind, options.env) ?? `internal://taskmarket402/api/agents/${specialistAgentSlug(agentKind)}`;
     const resource = createPaidAgentResource(snapshot, agentKind, baseResourceUrl);
 
-    if (agentKind === "contract_scanner" && contractScannerX402Mode(options.env) === "real") {
-      flow = "x402_contract_scanner_real";
-      const realResource = resourceWithPrice(
-        resource,
-        priceAmount(options.env?.X402_CONTRACT_SCANNER_PRICE_USD, resource.price)
-      );
+    if (x402AgentMode(agentKind, options.env) === "real") {
+      flow = "x402_real_agents";
+      const realResource = resourceWithPrice(resource, priceAmount(realResourcePrice(agentKind, options.env), resource.price));
 
       paymentEvents.push(
         paymentEvent(
           realResource,
           "real_x402_payment_required",
           "Real x402 payment required",
-          "Contract Scanner attempted the real x402 buyer/seller/facilitator path.",
+          `${agentLabel} attempted the real x402 buyer/seller/facilitator path.`,
           now,
           false
         )
       );
 
-      const buyer = options.contractScannerBuyer ?? payContractScannerWithX402;
       const realPayment = await buyer(
+        agentKind,
         {
           targetAddress: snapshot.mission.targetAddress
         },
@@ -222,8 +255,8 @@ export async function runPaidSpecialistAgentsWithDevPayment(
             "real_x402_paid",
             "Real x402 paid",
             realPayment.transactionPresent
-              ? "Contract Scanner settled through x402 and returned a specialist output."
-              : "Contract Scanner returned a settled x402 response; transaction details are kept server-side.",
+              ? `${agentLabel} settled through x402 and returned a specialist output.`
+              : `${agentLabel} returned a settled x402 response; transaction details are kept server-side.`,
             now,
             false
           )
@@ -233,7 +266,7 @@ export async function runPaidSpecialistAgentsWithDevPayment(
             realResource,
             "agent_output_returned",
             "Agent output returned",
-            "Contract Scanner returned output after real x402 settlement.",
+            `${agentLabel} returned output after real x402 settlement.`,
             now,
             false
           )
@@ -258,7 +291,7 @@ export async function runPaidSpecialistAgentsWithDevPayment(
           resource,
           "simulated_payment_used",
           "Simulated fallback used",
-          "Contract Scanner fell back to the existing simulated/dev paid-agent path after real x402 was unavailable.",
+          `${agentLabel} fell back to the existing simulated/dev paid-agent path after real x402 was unavailable.`,
           now,
           true
         )

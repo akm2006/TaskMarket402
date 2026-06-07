@@ -73,7 +73,7 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
           source: "ai_runtime",
           staticBaseline: "phase_one_mock_snapshot",
           specialistOutputSource: "real_data_agents",
-          paymentFlow: "x402_contract_scanner_real",
+          paymentFlow: "x402_real_agents",
           paymentEvents: [
             {
               id: "risk-report-demo:contract_scanner:risk-report-demo:contract-scanner:real_x402_payment_required",
@@ -115,30 +115,30 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
               simulatedSettlement: false
             },
             {
-              id: "risk-report-demo:wallet_behavior:risk-report-demo:wallet-behavior:payment_required",
-              type: "payment_required",
+              id: "risk-report-demo:wallet_behavior:risk-report-demo:wallet-behavior:real_x402_payment_required",
+              type: "real_x402_payment_required",
               agentKind: "wallet_behavior",
               taskId: "risk-report-demo:wallet-behavior",
               resourceId: "risk-report-demo:wallet_behavior:risk-report-demo:wallet-behavior",
-              title: "Payment required",
-              detail: "x402-style development challenge created before specialist output is returned.",
-              amount: "0.35",
+              title: "Real x402 payment required",
+              detail: "Wallet Behavior attempted the real x402 buyer/seller/facilitator path.",
+              amount: "0.001",
               currency: "USDC",
               occurredAt: "2026-05-31T12:00:00.000Z",
-              simulatedSettlement: true
+              simulatedSettlement: false
             },
             {
-              id: "risk-report-demo:wallet_behavior:risk-report-demo:wallet-behavior:dev_payment_accepted",
-              type: "dev_payment_accepted",
+              id: "risk-report-demo:wallet_behavior:risk-report-demo:wallet-behavior:real_x402_paid",
+              type: "real_x402_paid",
               agentKind: "wallet_behavior",
               taskId: "risk-report-demo:wallet-behavior",
               resourceId: "risk-report-demo:wallet_behavior:risk-report-demo:wallet-behavior",
-              title: "Development payment accepted",
-              detail: "Development-only proof accepted; no real x402 settlement occurred.",
-              amount: "0.35",
+              title: "Real x402 paid",
+              detail: "Wallet Behavior settled through x402 and returned a specialist output.",
+              amount: "0.001",
               currency: "USDC",
               occurredAt: "2026-05-31T12:00:00.000Z",
-              simulatedSettlement: true
+              simulatedSettlement: false
             },
             {
               id: "risk-report-demo:wallet_behavior:risk-report-demo:wallet-behavior:agent_output_returned",
@@ -147,37 +147,37 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
               taskId: "risk-report-demo:wallet-behavior",
               resourceId: "risk-report-demo:wallet_behavior:risk-report-demo:wallet-behavior",
               title: "Agent output returned",
-              detail: "Wallet Behavior returned a fallback output after simulated payment acceptance.",
-              amount: "0.35",
+              detail: "Wallet Behavior returned output after real x402 settlement.",
+              amount: "0.001",
               currency: "USDC",
               occurredAt: "2026-05-31T12:00:00.000Z",
-              simulatedSettlement: true
+              simulatedSettlement: false
             },
             {
               id: "risk-report-demo:market_context:risk-report-demo:market-context:payment_required",
-              type: "payment_required",
+              type: "real_x402_payment_required",
               agentKind: "market_context",
               taskId: "risk-report-demo:market-context",
               resourceId: "risk-report-demo:market_context:risk-report-demo:market-context",
-              title: "Payment required",
-              detail: "x402-style development challenge created before specialist output is returned.",
-              amount: "0.25",
+              title: "Real x402 payment required",
+              detail: "Market Context attempted the real x402 buyer/seller/facilitator path.",
+              amount: "0.001",
               currency: "USDC",
               occurredAt: "2026-05-31T12:00:00.000Z",
-              simulatedSettlement: true
+              simulatedSettlement: false
             },
             {
-              id: "risk-report-demo:market_context:risk-report-demo:market-context:dev_payment_accepted",
-              type: "dev_payment_accepted",
+              id: "risk-report-demo:market_context:risk-report-demo:market-context:real_x402_paid",
+              type: "real_x402_paid",
               agentKind: "market_context",
               taskId: "risk-report-demo:market-context",
               resourceId: "risk-report-demo:market_context:risk-report-demo:market-context",
-              title: "Development payment accepted",
-              detail: "Development-only proof accepted; no real x402 settlement occurred.",
-              amount: "0.25",
+              title: "Real x402 paid",
+              detail: "Market Context settled through x402 and returned a specialist output.",
+              amount: "0.001",
               currency: "USDC",
               occurredAt: "2026-05-31T12:00:00.000Z",
-              simulatedSettlement: true
+              simulatedSettlement: false
             },
             {
               id: "risk-report-demo:market_context:risk-report-demo:market-context:agent_output_returned",
@@ -186,11 +186,11 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
               taskId: "risk-report-demo:market-context",
               resourceId: "risk-report-demo:market_context:risk-report-demo:market-context",
               title: "Agent output returned",
-              detail: "Market Context returned a mock output after simulated payment acceptance.",
-              amount: "0.25",
+              detail: "Market Context returned output after real x402 settlement.",
+              amount: "0.001",
               currency: "USDC",
               occurredAt: "2026-05-31T12:00:00.000Z",
-              simulatedSettlement: true
+              simulatedSettlement: false
             }
           ],
           missionId: "risk-report-demo",
@@ -306,12 +306,11 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
     await page.getByTestId("run-ai-analysis").click();
 
     await expect(page.getByTestId("ai-runtime-result")).toBeVisible();
-    await expect(page.getByTestId("paid-agent-flow")).toContainText("Hybrid specialist paid-agent flow");
+    await expect(page.getByTestId("paid-agent-flow")).toContainText("Specialist x402 paid-agent flow");
     await expect(page.getByTestId("payment-badge-contract_scanner")).toContainText("Real x402 paid agent");
-    await expect(page.getByTestId("payment-badge-wallet_behavior")).toContainText("Simulated/dev paid agent");
-    await expect(page.getByTestId("payment-badge-market_context")).toContainText("Simulated/dev paid agent");
-    await expect(page.getByTestId("payment-agent-wallet_behavior")).not.toContainText("Real x402 paid agent");
-    await expect(page.getByTestId("payment-agent-market_context")).not.toContainText("Real x402 paid agent");
+    await expect(page.getByTestId("payment-badge-wallet_behavior")).toContainText("Real x402 paid agent");
+    await expect(page.getByTestId("payment-badge-market_context")).toContainText("Real x402 paid agent");
+    await expect(page.getByTestId("paid-agent-flow")).toContainText("not user-delegated spend yet");
     await expect(page.getByTestId("payment-audit-timeline")).toContainText("real_x402_paid");
     await expect(page.getByTestId("payment-audit-timeline")).toContainText("ai_verified");
     await expect(page.getByTestId("payment-audit-timeline")).toContainText("final_report_ready");

@@ -30,9 +30,8 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             <h1 className="mt-4 text-4xl font-semibold tracking-tight">{snapshot.mission.title}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">
               Target {snapshot.mission.targetAddress}. The WorkGraph now includes the Phase 7 MetaMask permission proof
-              layer, while keeping delegated x402 execution out of scope. Contract Scanner can use the live-proven Base
-              Sepolia x402 path, Wallet Behavior and Market Context stay on simulated/dev payment, and AI states are
-              labeled by provider and mode.
+              layer, while keeping delegated x402 execution out of scope. All three specialist agents can now use real
+              Base Sepolia x402 when configured, and AI states are labeled by provider and mode.
             </p>
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">

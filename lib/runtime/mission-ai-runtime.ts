@@ -262,6 +262,14 @@ function toPaymentEventDto(event: PaidAgentPaymentEvent): MissionAiPaymentEventD
   };
 }
 
+function usesPaidAgentFlow(paymentFlow: PaidAgentFlow): boolean {
+  return (
+    paymentFlow === "x402_style_dev" ||
+    paymentFlow === "x402_contract_scanner_real" ||
+    paymentFlow === "x402_real_agents"
+  );
+}
+
 export async function runDemoMissionAiRuntime(options: MissionAiRuntimeOptions = {}): Promise<MissionAiRuntimeResponse> {
   const snapshot = options.snapshot ?? phaseOneDemoSnapshot;
   const provider = options.provider ?? createAiProvider(options);
@@ -282,7 +290,7 @@ export async function runDemoMissionAiRuntime(options: MissionAiRuntimeOptions =
   } else if (options.agentRunner) {
     specialistRuns = await options.agentRunner(snapshot, agentOptions);
     paymentFlow = "direct_agents";
-  } else if (paymentFlow === "x402_style_dev") {
+  } else if (usesPaidAgentFlow(paymentFlow)) {
     const paidResult = options.paidAgentRunner
       ? await options.paidAgentRunner(snapshot, agentOptions)
       : await runPaidSpecialistAgentsWithDevPayment(snapshot, {

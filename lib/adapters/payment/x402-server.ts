@@ -25,6 +25,44 @@ const DEFAULT_SIMULATED_PAY_TO = "0x000000000000000000000000000000000000dEaD";
 export const DEFAULT_X402_FACILITATOR_URL = "https://x402.org/facilitator";
 export const DEFAULT_X402_BASE_SEPOLIA_NETWORK = "eip155:84532";
 export const DEFAULT_X402_CONTRACT_SCANNER_PRICE = "$0.001";
+export const DEFAULT_X402_AGENT_PRICE = "$0.001";
+
+const agentX402Env = {
+  contract_scanner: {
+    modeKey: "X402_CONTRACT_SCANNER_MODE",
+    priceKey: "X402_CONTRACT_SCANNER_PRICE_USD",
+    urlKey: "X402_CONTRACT_SCANNER_URL",
+    label: "Contract Scanner",
+    serviceName: "TaskMarket402 Contract Scanner",
+    description: "Contract Scanner Agent output for TaskMarket402 Wallet / Token Risk Report"
+  },
+  wallet_behavior: {
+    modeKey: "X402_WALLET_BEHAVIOR_MODE",
+    priceKey: "X402_WALLET_BEHAVIOR_PRICE_USD",
+    urlKey: "X402_WALLET_BEHAVIOR_URL",
+    label: "Wallet Behavior",
+    serviceName: "TaskMarket402 Wallet Behavior",
+    description: "Wallet Behavior Agent output for TaskMarket402 Wallet / Token Risk Report"
+  },
+  market_context: {
+    modeKey: "X402_MARKET_CONTEXT_MODE",
+    priceKey: "X402_MARKET_CONTEXT_PRICE_USD",
+    urlKey: "X402_MARKET_CONTEXT_URL",
+    label: "Market Context",
+    serviceName: "TaskMarket402 Market Context",
+    description: "Market Context Agent output for TaskMarket402 Wallet / Token Risk Report"
+  }
+} satisfies Record<
+  SpecialistAgentKind,
+  {
+    modeKey: string;
+    priceKey: string;
+    urlKey: string;
+    label: string;
+    serviceName: string;
+    description: string;
+  }
+>;
 
 export type X402DevPaymentFailureReason =
   | "missing_payment_proof"
@@ -85,27 +123,34 @@ export interface X402DevPaymentRejected {
 
 export type X402DevPaymentVerification = X402DevPaymentAccepted | X402DevPaymentRejected;
 
-export type X402ContractScannerMode = "simulated" | "real";
+export type X402AgentMode = "simulated" | "real";
+export type X402ContractScannerMode = X402AgentMode;
 
-export interface X402ContractScannerSellerConfig {
+export interface X402AgentSellerConfig {
+  agentKind: SpecialistAgentKind;
   facilitatorUrl: string;
   network: Network;
   payTo: `0x${string}`;
   price: string;
+  serviceName: string;
+  description: string;
 }
 
-export type X402ContractScannerSellerConfigResult =
+export type X402AgentSellerConfigResult =
   | {
       ok: true;
       mode: "real";
-      config: X402ContractScannerSellerConfig;
+      config: X402AgentSellerConfig;
     }
   | {
       ok: false;
-      mode: X402ContractScannerMode;
+      mode: X402AgentMode;
       missing: string[];
       invalid: string[];
     };
+
+export type X402ContractScannerSellerConfig = X402AgentSellerConfig;
+export type X402ContractScannerSellerConfigResult = X402AgentSellerConfigResult;
 
 export interface X402PaymentResponsePayload {
   x402Version: 2;
@@ -118,8 +163,33 @@ export interface X402PaymentResponsePayload {
   simulatedSettlement: true;
 }
 
+export function x402AgentEnvKeys(agentKind: SpecialistAgentKind): {
+  modeKey: string;
+  priceKey: string;
+  urlKey: string;
+} {
+  const config = agentX402Env[agentKind];
+
+  return {
+    modeKey: config.modeKey,
+    priceKey: config.priceKey,
+    urlKey: config.urlKey
+  };
+}
+
+export function x402AgentLabel(agentKind: SpecialistAgentKind): string {
+  return agentX402Env[agentKind].label;
+}
+
+export function x402AgentMode(
+  agentKind: SpecialistAgentKind,
+  env: Record<string, string | undefined> = process.env
+): X402AgentMode {
+  return env[agentX402Env[agentKind].modeKey] === "real" ? "real" : "simulated";
+}
+
 export function contractScannerX402Mode(env: Record<string, string | undefined> = process.env): X402ContractScannerMode {
-  return env.X402_CONTRACT_SCANNER_MODE === "real" ? "real" : "simulated";
+  return x402AgentMode("contract_scanner", env);
 }
 
 function hasValue(value: string | undefined): value is string {
@@ -151,10 +221,11 @@ function priceIsValid(value: string): boolean {
   return /^[0-9]+(?:\.[0-9]{1,6})?$/.test(priceBody);
 }
 
-export function resolveContractScannerSellerConfig(
+export function resolveAgentSellerConfig(
+  agentKind: SpecialistAgentKind,
   env: Record<string, string | undefined> = process.env
-): X402ContractScannerSellerConfigResult {
-  const mode = contractScannerX402Mode(env);
+): X402AgentSellerConfigResult {
+  const mode = x402AgentMode(agentKind, env);
 
   if (mode !== "real") {
     return {
@@ -167,10 +238,11 @@ export function resolveContractScannerSellerConfig(
 
   const missing: string[] = [];
   const invalid: string[] = [];
+  const agentConfig = agentX402Env[agentKind];
   const facilitatorUrl = env.X402_FACILITATOR_URL?.trim() || DEFAULT_X402_FACILITATOR_URL;
   const network = env.X402_SETTLEMENT_NETWORK?.trim();
   const payTo = env.X402_PAY_TO_ADDRESS?.trim();
-  const price = normalizePrice(env.X402_CONTRACT_SCANNER_PRICE_USD || DEFAULT_X402_CONTRACT_SCANNER_PRICE);
+  const price = normalizePrice(env[agentConfig.priceKey] || DEFAULT_X402_AGENT_PRICE);
 
   if (!hasValue(network)) {
     missing.push("X402_SETTLEMENT_NETWORK");
@@ -191,7 +263,7 @@ export function resolveContractScannerSellerConfig(
   }
 
   if (!priceIsValid(price)) {
-    invalid.push("X402_CONTRACT_SCANNER_PRICE_USD");
+    invalid.push(agentConfig.priceKey);
   }
 
   if (missing.length > 0 || invalid.length > 0 || !network || !payTo || !isEvmAddress(payTo)) {
@@ -207,15 +279,24 @@ export function resolveContractScannerSellerConfig(
     ok: true,
     mode,
     config: {
+      agentKind,
       facilitatorUrl,
       network: network as Network,
       payTo,
-      price
+      price,
+      serviceName: agentConfig.serviceName,
+      description: agentConfig.description
     }
   };
 }
 
-export function createContractScannerRouteConfig(config: X402ContractScannerSellerConfig): RouteConfig {
+export function resolveContractScannerSellerConfig(
+  env: Record<string, string | undefined> = process.env
+): X402ContractScannerSellerConfigResult {
+  return resolveAgentSellerConfig("contract_scanner", env);
+}
+
+export function createAgentRouteConfig(config: X402AgentSellerConfig): RouteConfig {
   return {
     accepts: {
       scheme: "exact",
@@ -223,14 +304,15 @@ export function createContractScannerRouteConfig(config: X402ContractScannerSell
       network: config.network,
       payTo: config.payTo
     },
-    description: "Contract Scanner Agent output for TaskMarket402 Wallet / Token Risk Report",
+    description: config.description,
     mimeType: "application/json",
-    serviceName: "TaskMarket402 Contract Scanner",
+    serviceName: config.serviceName,
     unpaidResponseBody: () => ({
       contentType: "application/json",
       body: {
         source: "paid_agent_endpoint",
-        phase: "phase-5-real-x402",
+        phase: "phase-8-real-x402-all-agents",
+        agentKind: config.agentKind,
         payment: {
           state: "real_x402_payment_required",
           network: config.network,
@@ -242,7 +324,8 @@ export function createContractScannerRouteConfig(config: X402ContractScannerSell
       contentType: "application/json",
       body: {
         source: "paid_agent_endpoint",
-        phase: "phase-5-real-x402",
+        phase: "phase-8-real-x402-all-agents",
+        agentKind: config.agentKind,
         payment: {
           state: "real_x402_failed",
           network: config.network,
@@ -253,14 +336,20 @@ export function createContractScannerRouteConfig(config: X402ContractScannerSell
   };
 }
 
-export function createContractScannerX402ResourceServer(
-  config: X402ContractScannerSellerConfig
-): x402ResourceServer {
+export function createContractScannerRouteConfig(config: X402ContractScannerSellerConfig): RouteConfig {
+  return createAgentRouteConfig(config);
+}
+
+export function createAgentX402ResourceServer(config: X402AgentSellerConfig): x402ResourceServer {
   return new x402ResourceServer(
     new HTTPFacilitatorClient({
       url: config.facilitatorUrl
     })
   ).register(config.network, new ExactEvmScheme());
+}
+
+export function createContractScannerX402ResourceServer(config: X402ContractScannerSellerConfig): x402ResourceServer {
+  return createAgentX402ResourceServer(config);
 }
 
 export function createX402ProtectedResource(input: {
