@@ -1,5 +1,62 @@
 # Build Log
 
+## 2026-06-07 - Phase 7 Live MetaMask Permission Proof Passed
+
+- Completed the manual/live Phase 7 MetaMask permission proof in the browser after the Base Sepolia switch/recheck patch.
+- No 1Shot, ERC-7710 redemption, x402 behavior changes, Supabase, wallet private-key handling, production custody logic, or new product features were added.
+- Sanitized user-provided proof:
+  - connected wallet: `0xf39f...2266`
+  - app-reported chain id: `84532`
+  - ETH readiness: `0` / empty
+  - USDC readiness: `276.873474` / ready
+  - delegate/session public address: `0x17dF...5108`
+  - permission state: scoped mission-budget permission receipt granted
+  - receipt id: `tm_fdb4c124`
+  - context hash: `tm_5fbe9b71`
+  - dependency count: `0`
+- Proof boundary: this proves MetaMask wallet connection, Base Sepolia readiness, and scoped Advanced Permissions receipt metadata only. It does not prove delegated x402 execution, ERC-7710 redemption, 1Shot relay/status, Supabase persistence, or real x402 for Wallet Behavior and Market Context.
+- No secrets, private keys, raw wallet responses, raw permission payloads, signatures, headers, or raw delegation context were reported or stored.
+- Verification note: a post-proof `pnpm smoke:gemini` run returned a sanitized `structured_output` / `InvalidJson` fallback for plan/report while the app fallback stayed safe. The smoke assertion helper was updated to treat `structured_output` as a diagnosed provider fallback category, matching the existing rate-limit/network fallback handling.
+
+## 2026-06-07 - Phase 7 Manual MetaMask Readiness Diagnosis
+
+- Ran the manual/live Phase 7 MetaMask permission proof checklist up to wallet readiness.
+- No 1Shot, ERC-7710 redemption, x402 behavior changes, Supabase, wallet private-key handling, production custody logic, or new product features were added.
+- Local dev server was started on `http://127.0.0.1:3000`, and `/missions/new` rendered the MetaMask permission proof panel without browser console errors in the automation browser.
+- Manual sanitized result reported by the user: connected wallet `0xb165...3336`, app-reported chain `1`, ETH readiness unavailable, USDC readiness unavailable, and state `wrong_network`, while the user expected MetaMask to be on Base Sepolia.
+- Diagnosis: the injected MetaMask provider returned `eth_chainId=1` for the connected dapp session, so the app correctly blocked permission requests. This is a wrong-network/stale-provider-session readiness failure, not a successful permission proof.
+- Patch applied: added an explicit Base Sepolia `wallet_switchEthereumChain` / `wallet_addEthereumChain` switch-recheck path, chain/account event handling, and a pre-permission `eth_chainId` guard so permission requests cannot proceed when the provider still reports Mainnet.
+- Added unit coverage for wrong-chain permission rejection and Base Sepolia switch request behavior.
+- Updated `docs/research/metamask-smart-accounts.md` with the network switch/recheck finding.
+- Verification passed after the patch: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:e2e`, `pnpm verify`, `pnpm build`, `pnpm smoke:x402`, `pnpm smoke:gemini`, and `pnpm smoke:venice`.
+- Live x402 continuity result: `pnpm smoke:x402` returned `real_x402_paid`, response status `200`, settlement present, and transaction present while the local Contract Scanner route was served on port 3000.
+- Gemini smoke result: live Gemini completed plan, verification, and report steps in development mode.
+- Venice smoke result: auth and selected model checks passed, but live inference remains blocked by `credits_billing` / `canConsume=false`.
+- Warning: the first `pnpm test:e2e` attempt failed because the manual proof dev server was still running on port 3000; after stopping that temporary server, e2e passed. Playwright still reports the existing React Flow dev-server `nodeTypes/edgeTypes` warning while tests pass.
+- Manual proof status: still pending. Do not claim Phase 7 MetaMask permission proof succeeded until a real MetaMask approval returns `permission_granted` with sanitized receipt/hash/id metadata.
+
+## 2026-06-02 - Phase 7 MetaMask Mission Permission Proof
+
+- Built Phase 7 only: MetaMask wallet connection/readiness UI and scoped mission-budget permission receipt proof.
+- No 1Shot, ERC-7710 redemption/execution, Supabase, new x402 behavior, Wallet Behavior real x402, Market Context real x402, landing polish, deployment, wallet private-key handling, or production custody logic was added.
+- Used `AGENTS.md`, `README.md`, `docs/PRODUCT_COMPLETION_PLAN.md`, `docs/research/*`, `docs/BUILD_LOG.md`, and `graphify-out/GRAPH_REPORT.md`.
+- Researched current MetaMask Smart Accounts Kit / Advanced Permissions docs through official docs and Context7, then inspected installed package types/source.
+- Installed `@metamask/smart-accounts-kit@1.6.0`; installed types show `erc7715ProviderActions()` and `requestExecutionPermissions([...])` with a `to` delegate/session address field.
+- Updated `docs/research/metamask-smart-accounts.md` with package names, API shape, Base Sepolia assumptions, env vars, failure modes, and uncertainties.
+- Added `lib/core/mission-permission.ts` with client-safe wallet/permission states, policy-to-permission request mapping, unsafe-policy rejection, and sanitized receipt metadata.
+- Replaced the MetaMask wallet adapter placeholder with browser-only wallet connection, Base Sepolia readiness reads, ETH/USDC readiness, and Advanced Permissions request handling.
+- Added `components/mission/MetaMaskPermissionPanel.tsx` and mounted it on `/missions/new`.
+- Updated the WorkGraph static snapshot with a `MetaMask Permission Proof` node and permission-state metadata while keeping the node as a proof boundary, not delegated execution.
+- Updated `.env.example` with safe public variable names only: `NEXT_PUBLIC_USDC_CONTRACT_ADDRESS`, `NEXT_PUBLIC_METAMASK_SESSION_ACCOUNT_ADDRESS`, and `NEXT_PUBLIC_MISSION_PERMISSION_PERIOD_SECONDS`.
+- Added unit tests for policy-to-permission mapping, wrong-chain rejection, unsafe budget rejection, and receipt sanitization.
+- Updated Playwright smoke coverage for the wallet readiness panel, permission states, and the explicit "No delegated x402 execution yet" disclaimer.
+- Verification passed: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:e2e`, `pnpm verify`, `pnpm build`, `pnpm smoke:x402`, `pnpm smoke:gemini`, `pnpm smoke:venice`, and `graphify update .`.
+- Live x402 continuity check: initial `pnpm smoke:x402` failed with sanitized `request` / `TypeError` because no local server was listening on the configured `localhost:3000` scanner URL. After starting a temporary local dev server, `pnpm smoke:x402` passed with `real_x402_paid`, response status `200`, settlement present, and transaction present.
+- Smoke status: Gemini smoke passed with sanitized `rate_limit` fallback for later calls; Venice smoke passed diagnostics but live inference remains blocked by `credits_billing` / `canConsume=false`.
+- Warning: Playwright still reports the existing React Flow dev-server `nodeTypes/edgeTypes` warning while tests pass.
+- Remaining limitation: Phase 7 proves wallet connection and permission receipt request only. It does not prove user-authorized x402 execution, ERC-7710 redemption, 1Shot relay/status, Supabase persistence, or real x402 for Wallet Behavior and Market Context.
+- Next recommended prompt: "Build Phase 8 only: upgrade Wallet Behavior and Market Context to real x402 testnet paid-agent paths, keeping MetaMask permission receipt proof separate from payment execution until the delegated execution phase."
+
 ## 2026-06-01 - Product Completion Roadmap Context
 
 - Added `docs/PRODUCT_COMPLETION_PLAN.md` and accepted it as the current source-of-truth roadmap for TaskMarket402.

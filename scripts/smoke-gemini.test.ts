@@ -118,7 +118,8 @@ function isDiagnosedProviderFallback(value: { diagnostic?: AiFailureDiagnostic; 
     value.state === "request_failed" &&
     (value.diagnostic?.providerCategory === "provider" ||
       value.diagnostic?.providerCategory === "rate_limit" ||
-      value.diagnostic?.providerCategory === "network")
+      value.diagnostic?.providerCategory === "network" ||
+      value.diagnostic?.providerCategory === "structured_output")
   );
 }
 

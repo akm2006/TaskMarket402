@@ -48,7 +48,7 @@ export interface WorkGraphNode {
   id: string;
   label: string;
   status: WorkGraphNodeStatus;
-  kind: "mission" | "agent" | "payment" | "relay" | "verification" | "report";
+  kind: "mission" | "permission" | "agent" | "payment" | "relay" | "verification" | "report";
   metadata?: Record<string, string>;
 }
 

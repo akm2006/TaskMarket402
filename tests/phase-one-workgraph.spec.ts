@@ -8,6 +8,7 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
     await expect(page.getByRole("heading", { name: /Mission Budget WorkGraph/i })).toBeVisible();
     await expect(page.getByTestId("workgraph-canvas")).toBeVisible();
     await expect(page.getByTestId("workgraph-node-mission-budget")).toBeVisible();
+    await expect(page.getByTestId("workgraph-node-metamask-permission")).toBeVisible();
     await expect(page.getByTestId("workgraph-node-manager-agent")).toBeVisible();
   });
 
@@ -16,8 +17,18 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
 
     await expect(page.getByTestId("create-mission-page")).toBeVisible();
     await expect(page.getByTestId("create-mission-form")).toBeVisible();
+    await expect(page.getByTestId("wallet-readiness-panel")).toBeVisible();
     await expect(page.locator('input[value="Wallet / Token Risk Report"]')).toBeVisible();
-    await expect(page.getByRole("link", { name: /Open Mock Mission/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Open Mission WorkGraph/i })).toBeVisible();
+    await expect(page.getByTestId("permission-state-wallet_not_connected")).toBeVisible();
+    await expect(page.getByTestId("permission-state-wallet_connected")).toBeVisible();
+    await expect(page.getByTestId("permission-state-wrong_network")).toBeVisible();
+    await expect(page.getByTestId("permission-state-permission_requested")).toBeVisible();
+    await expect(page.getByTestId("permission-state-permission_granted")).toBeVisible();
+    await expect(page.getByTestId("permission-state-permission_rejected")).toBeVisible();
+    await expect(page.getByTestId("permission-state-permission_unavailable")).toBeVisible();
+    await expect(page.getByTestId("permission-proof-disclaimer")).toContainText("No delegated x402 execution yet");
+    await expect(page.getByTestId("permission-receipt-panel")).toContainText("never raw wallet payloads");
   });
 
   test("mission detail page exposes core audit graph nodes", async ({ page }) => {
@@ -28,6 +39,7 @@ test.describe("Phase 1 WorkGraph smoke tests", () => {
     await expect(page.getByTestId("ai-runtime-panel")).toBeVisible();
     await expect(page.getByTestId("ai-runtime-empty")).toContainText("Static mock snapshot");
     await expect(page.getByTestId("workgraph-node-mission-budget")).toBeVisible();
+    await expect(page.getByTestId("workgraph-node-metamask-permission")).toBeVisible();
     await expect(page.getByTestId("workgraph-node-manager-agent")).toBeVisible();
     await expect(page.getByTestId("workgraph-node-contract-scanner")).toBeVisible();
     await expect(page.getByTestId("workgraph-node-x402-payment")).toBeVisible();

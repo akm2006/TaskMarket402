@@ -59,6 +59,13 @@ const workGraph: WorkGraph = {
       scope: "Wallet / Token Risk Report",
       mode: "Hybrid demo baseline"
     }),
+    node("metamask-permission", "MetaMask Permission Proof", "permission", "planned", {
+      network: "Base Sepolia",
+      status: "Phase 7 wallet permission receipt",
+      scope: "Wallet connection -> scoped mission-budget permission",
+      states: "wallet_not_connected / wallet_connected / wrong_network / permission_requested / permission_granted / permission_rejected / permission_unavailable",
+      proofBoundary: "No delegated x402 execution yet"
+    }),
     node("manager-agent", "Manager Agent", "agent", "running", {
       objective: "Split mission budget into bounded specialist work.",
       output: "Three-task plan",
@@ -115,7 +122,18 @@ const workGraph: WorkGraph = {
     })
   ],
   edges: [
-    { id: "mission-manager", source: "mission-budget", target: "manager-agent", label: "Mission authority to planning" },
+    {
+      id: "mission-permission",
+      source: "mission-budget",
+      target: "metamask-permission",
+      label: "Budget scope to wallet permission"
+    },
+    {
+      id: "permission-manager",
+      source: "metamask-permission",
+      target: "manager-agent",
+      label: "Permission receipt enables planning proof"
+    },
     { id: "manager-contract", source: "manager-agent", target: "contract-scanner", label: "0.40 USDC sub-budget" },
     { id: "manager-wallet", source: "manager-agent", target: "wallet-behavior", label: "0.35 USDC sub-budget" },
     { id: "manager-market", source: "manager-agent", target: "market-context", label: "0.25 USDC sub-budget" },

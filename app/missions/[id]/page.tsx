@@ -29,9 +29,10 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             </Link>
             <h1 className="mt-4 text-4xl font-semibold tracking-tight">{snapshot.mission.title}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">
-              Target {snapshot.mission.targetAddress}. The WorkGraph shows the current hybrid demo state: Contract
-              Scanner can use the live-proven Base Sepolia x402 path, Wallet Behavior and Market Context stay on
-              simulated/dev payment, and AI states are labeled by provider and mode.
+              Target {snapshot.mission.targetAddress}. The WorkGraph now includes the Phase 7 MetaMask permission proof
+              layer, while keeping delegated x402 execution out of scope. Contract Scanner can use the live-proven Base
+              Sepolia x402 path, Wallet Behavior and Market Context stay on simulated/dev payment, and AI states are
+              labeled by provider and mode.
             </p>
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
@@ -53,9 +54,10 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
               <p className="text-sm font-semibold uppercase tracking-wide text-cyan-300">Audit Graph</p>
               <h2 className="mt-1 text-2xl font-semibold">Every budget and payment state in one graph</h2>
             </div>
-            <p className="max-w-2xl text-sm leading-6 text-zinc-400">
-              Payment, specialist output, verification, report synthesis, and blocked spend stay visible as audit events.
-              The UI distinguishes real x402 from simulated payment instead of blending them together.
+              <p className="max-w-2xl text-sm leading-6 text-zinc-400">
+              Wallet permission, payment, specialist output, verification, report synthesis, and blocked spend stay
+              visible as audit events. The UI distinguishes real x402 from simulated payment instead of blending them
+              together.
             </p>
           </div>
           <WorkGraphCanvas graph={snapshot.workGraph} />

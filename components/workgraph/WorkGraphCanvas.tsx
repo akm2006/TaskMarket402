@@ -35,19 +35,21 @@ const defaultEdgeOptions = { type: "smoothstep" };
 
 const layeredPositions: Record<string, { column: number; row: number }> = {
   "mission-budget": { column: 0, row: 1 },
-  "manager-agent": { column: 1, row: 1 },
-  "contract-scanner": { column: 2, row: 0 },
-  "wallet-behavior": { column: 2, row: 1 },
-  "market-context": { column: 2, row: 2 },
-  "x402-payment": { column: 3, row: 0 },
-  "oneshot-relay": { column: 4, row: 0 },
-  "venice-verification": { column: 3, row: 1.5 },
-  "final-report": { column: 4, row: 1.5 },
-  "blocked-payment": { column: 3, row: 2.85 }
+  "metamask-permission": { column: 1, row: 1 },
+  "manager-agent": { column: 2, row: 1 },
+  "contract-scanner": { column: 3, row: 0 },
+  "wallet-behavior": { column: 3, row: 1 },
+  "market-context": { column: 3, row: 2 },
+  "x402-payment": { column: 4, row: 0 },
+  "oneshot-relay": { column: 5, row: 0 },
+  "venice-verification": { column: 4, row: 1.5 },
+  "final-report": { column: 5, row: 1.5 },
+  "blocked-payment": { column: 4, row: 2.85 }
 };
 
 const categoryLabels: Record<GraphCategory, string> = {
   mission: "Mission",
+  permission: "Permission",
   manager: "Manager",
   agent: "Specialist",
   payment: "Payment",
@@ -71,6 +73,7 @@ const statusLabels: Record<WorkGraphNodeStatus, string> = {
 
 const nodeThemes: Record<GraphCategory, string> = {
   mission: "border-cyan-300/70 bg-cyan-950/90 text-cyan-50 shadow-cyan-950/40",
+  permission: "border-sky-300/70 bg-sky-950/90 text-sky-50 shadow-sky-950/40",
   manager: "border-violet-300/70 bg-violet-950/90 text-violet-50 shadow-violet-950/40",
   agent: "border-emerald-300/65 bg-emerald-950/90 text-emerald-50 shadow-emerald-950/40",
   payment: "border-amber-300/75 bg-amber-950/90 text-amber-50 shadow-amber-950/40",
@@ -82,6 +85,7 @@ const nodeThemes: Record<GraphCategory, string> = {
 
 const minimapColors: Record<GraphCategory, string> = {
   mission: "#22d3ee",
+  permission: "#38bdf8",
   manager: "#a78bfa",
   agent: "#34d399",
   payment: "#f59e0b",
@@ -112,6 +116,12 @@ function getNodeText(node: WorkGraphNode): Pick<AuditNodeData, "eyebrow" | "prim
         eyebrow: "Budget authority",
         primary: metadata.budget ?? "3.00 USDC",
         secondary: `Max ${metadata.maxPerAgent ?? "0.50 USDC"} per agent`
+      };
+    case "metamask-permission":
+      return {
+        eyebrow: metadata.network ?? "Base Sepolia",
+        primary: metadata.status ?? "Permission proof pending",
+        secondary: metadata.scope ?? "Scoped mission-budget permission receipt"
       };
     case "manager-agent":
       return {
