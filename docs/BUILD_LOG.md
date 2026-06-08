@@ -402,3 +402,21 @@
 - Remaining warning: React Flow still logs the dev-server `nodeTypes/edgeTypes` warning in Playwright even after module-scoped and memoized node type references; tests pass. A larger no-custom-node refactor could remove the prop entirely if this warning becomes demo-blocking.
 - Remaining limitations: Contract Scanner is the only real x402 specialist path. Wallet Behavior and Market Context remain simulated/dev payment. Venice live inference remains `credits_billing` fallback. MetaMask, ERC-7710, 1Shot, Supabase, and wallet UI remain out of scope.
 - Next recommended prompt: "Create the Phase 6 UI checkpoint commit after reviewing the browser screen once, then plan the MetaMask/ERC-7710/1Shot golden-path phase without changing Wallet Behavior or Market Context payment mode."
+
+## 2026-06-07 - Phase 9 ERC-7710 / 1Shot Readiness Plan
+
+- Prepared Phase 9 only: research and exact implementation planning for the Contract Scanner delegated ERC-7710 / 1Shot golden path.
+- No code, package install, runtime behavior, MetaMask execution, 1Shot execution, x402 behavior, Supabase, or app UI changes were made.
+- Used `AGENTS.md`, `README.md`, `docs/PRODUCT_COMPLETION_PLAN.md`, `docs/research/*`, `docs/BUILD_LOG.md`, `graphify-out/GRAPH_REPORT.md`, `sponsor-docs-rag`, `research-gated-implementation`, and `integration-spine-builder`.
+- Re-checked official MetaMask Advanced Permissions / ERC-7715 docs, MetaMask x402 buyer delegation docs, installed `@metamask/smart-accounts-kit@1.6.0` types, official 1Shot Public Relayer docs/OpenRPC, official 1Shot x402 docs, official x402 network/token support docs, Context7 `/coinbase/x402`, and npm package metadata for `@metamask/x402` and `@1shotapi/x402-facilitator`.
+- Verified current installed Smart Accounts Kit exports include `erc7715ProviderActions`, `erc7710WalletActions`, `erc7710BundlerActions`, `redelegatePermissionContext`, and experimental `createx402DelegationProvider`.
+- Verified 1Shot OpenRPC method names: `relayer_getCapabilities`, `relayer_getFeeData`, `relayer_estimate7710Transaction`, `relayer_send7710Transaction`, and `relayer_getStatus`.
+- Ran a no-secret 1Shot testnet capabilities check for Base Sepolia `84532`; it returned HTTP `200`, USDC support, and present `feeCollector` / `targetAddress`.
+- Recommended Phase 9 path: request or redelegate a Contract Scanner-scoped MetaMask permission to the 1Shot relayer `targetAddress`, submit a narrow ERC-7710 USDC funding/spend bundle through `relayer_send7710Transaction`, poll `relayer_getStatus`, then run the existing Contract Scanner real x402 path and record both 1Shot and x402 evidence in the WorkGraph.
+- Fallback path: if direct permission to 1Shot target address is not viable, use `redelegatePermissionContext` from an app session/delegate account; if direct 1Shot x402 facilitation is later selected, re-check `@1shotapi/x402-facilitator` compatibility and account/API-key requirements before installing.
+- Updated `docs/research/oneshot.md` with API shape, Base Sepolia readiness, Phase 9 architecture, env plan, test plan, smoke plan, risks, and must-not-fake boundaries.
+- Updated `docs/research/metamask-smart-accounts.md` with Phase 9 ERC-7710/x402 readiness, current package export shape, permission strategy, client-safe evidence rules, and secrets boundaries.
+- Commands run: `pnpm lint`, `pnpm typecheck`, `pnpm verify`, and `graphify update .`.
+- Validation result: all requested commands passed. Graphify rebuilt `graphify-out/graph.json`, `graphify-out/graph.html`, and `graphify-out/GRAPH_REPORT.md`.
+- Warnings: `README.md` still has older status wording in places; it was not edited because this pass was limited to Phase 9 research/build-log updates. Git reported line-ending normalization warnings for the edited markdown files.
+- Next recommended prompt: "Implement Phase 9B only: Contract Scanner ERC-7710 / 1Shot delegated proof. Re-read `docs/research/oneshot.md` and `docs/research/metamask-smart-accounts.md`, fetch 1Shot Base Sepolia capabilities, request or redelegate permission to the 1Shot target address, submit one narrow USDC delegated bundle, poll status, then run the existing Contract Scanner real x402 path without changing Wallet Behavior or Market Context delegation state."
